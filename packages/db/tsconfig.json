@@ -1,0 +1,7 @@
+{
+  "extends": "@evidence/tsconfig/library.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src", "*.ts"]
+}

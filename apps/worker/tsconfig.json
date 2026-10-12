@@ -1,0 +1,7 @@
+{
+  "extends": "@evidence/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src", "*.ts"]
+}

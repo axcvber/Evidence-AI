@@ -1,0 +1,10 @@
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+next-env.d.ts
+
+# Hand-written docs are kept as authored
+docs
+CLAUDE.md

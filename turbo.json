@@ -12,7 +12,8 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_*", "TEST_DATABASE_*"]
     },
     "dev": {
       "dependsOn": ["^build"],

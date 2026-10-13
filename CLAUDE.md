@@ -51,13 +51,15 @@ First run: `cp .env.example .env && pnpm install && pnpm infra:up`. Node 24, pnp
 
 - `pnpm dev` – api (:4000), worker and web (:3000) in watch mode; needs `pnpm infra:up` first
 - `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`
-- `pnpm test` – unit and integration tests (Vitest, per workspace via turbo)
+- `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). `packages/db` RLS tests need `pnpm infra:up` and run against the `evidence_test` database
 - `pnpm infra:up` / `pnpm infra:down` – Docker Compose: Postgres+pgvector (:5440), Redis (:6390), MinIO (:9000, console :9001), Langfuse (:3100), ClickHouse (internal)
 - `pnpm e2e` – Playwright (not yet created)
 - `pnpm eval` – run the eval suite (not yet created)
-- `pnpm db:migrate`, `pnpm db:seed` (not yet created; step 1.3)
+- `pnpm db:generate` – generate a migration from `packages/db/src/schema` (`pnpm --filter @evidence/db exec drizzle-kit generate --custom --name x` for hand-written SQL)
+- `pnpm db:migrate` – apply migrations as `evidence_owner` (`DATABASE_OWNER_URL`)
+- `pnpm db:seed` (not yet created; step 2.9)
 
-Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS).
+Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS, owns nothing); migrations run as `evidence_owner`. Every new table in `public` needs RLS and a policy (a catalog test enforces this); tenant policies use the helpers in `packages/db/src/schema/rls.ts`. Changes to `infra/docker/postgres/init` need the Postgres volume recreated.
 
 ## Working style
 

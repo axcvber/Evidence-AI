@@ -13,9 +13,10 @@ const groupB = '00000000-0000-4000-8000-0000000064b0';
 const tenantTables = ['memberships', 'groups', 'group_members', 'audit_log'] as const;
 
 beforeAll(async () => {
-  await ownerPool.query(
-    'truncate tenants, users, memberships, groups, group_members, audit_log restart identity cascade',
-  );
+  // Other packages' suites share evidence_test, so only this file's fixtures are reset.
+  // Deleting tenants and users cascades to everything that references them.
+  await ownerPool.query('delete from tenants where id = any($1)', [[tenantA, tenantB]]);
+  await ownerPool.query('delete from users where id = any($1)', [[alice, bob, carol]]);
   await ownerPool.query(`
     insert into tenants (id, name, slug) values
       ('${tenantA}', 'Tenant A', 'tenant-a'),

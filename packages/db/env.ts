@@ -3,10 +3,10 @@ import path from 'node:path';
 import { parseEnv } from '@evidence/shared';
 import { z } from 'zod';
 
-// Tooling in this package (drizzle-kit, tests) runs from packages/db and reads the root .env.
-// Deployed environments inject variables directly, so a missing file is fine.
-const rootEnvFile = path.resolve(process.cwd(), '../../.env');
-if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
+// Tooling in this package (drizzle-kit, tests) runs from packages/db and reads packages/db/.env.
+// CI and deployed environments inject variables directly, so a missing file is fine.
+const envFile = path.resolve(process.cwd(), '.env');
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 

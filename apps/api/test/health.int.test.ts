@@ -5,12 +5,15 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
+import { testEnv } from './support/env.js';
 
 describe('GET /health', () => {
   let app: INestApplication<Server>;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule.register({ databaseUrl: testEnv.TEST_DATABASE_URL })],
+    }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
   });

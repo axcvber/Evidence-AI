@@ -47,9 +47,12 @@ Use current stable versions. Check official docs for APIs that change often (Nex
 
 ## Commands
 
-First run: `cp .env.example .env && pnpm install && pnpm infra:up`. Node 24, pnpm 11.
+First run: `pnpm install && pnpm env:init && pnpm infra:up && pnpm db:migrate`. Node 24, pnpm 11.
+
+Env files: one per workspace, each with a committed `.env.example`; `pnpm env:init` creates missing ones and never overwrites. Root `.env` is Docker Compose only (no app reads it); `apps/api/.env`, `apps/worker/.env`, `apps/web/.env.local` (loaded natively by Next) and `packages/db/.env` (owner + test DB URLs). Each process loads only its own file and validates it with Zod; CI and AWS inject variables directly. When adding a variable, add it to the right `.env.example` and that app's env schema.
 
 - `pnpm dev` – api (:4000), worker and web (:3000) in watch mode; needs `pnpm infra:up` first
+- API docs – Swagger UI at http://localhost:4000/docs, OpenAPI JSON at `/docs-json` (on by default outside production; `API_DOCS_ENABLED` overrides). Document every endpoint: `@ApiTags`, `@ApiOperation`, and Zod schemas via `standardSchema` on response decorators (`z.toJSONSchema()` for `@ApiBody`)
 - `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`
 - `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). `packages/db` RLS tests need `pnpm infra:up` and run against the `evidence_test` database
 - `pnpm infra:up` / `pnpm infra:down` – Docker Compose: Postgres+pgvector (:5440), Redis (:6390), MinIO (:9000, console :9001), Langfuse (:3100), ClickHouse (internal)
@@ -59,7 +62,7 @@ First run: `cp .env.example .env && pnpm install && pnpm infra:up`. Node 24, pnp
 - `pnpm db:migrate` – apply migrations as `evidence_owner` (`DATABASE_OWNER_URL`)
 - `pnpm db:seed` (not yet created; step 2.9)
 
-Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS, owns nothing); migrations run as `evidence_owner`. Every new table in `public` needs RLS and a policy (a catalog test enforces this); tenant policies use the helpers in `packages/db/src/schema/rls.ts`. Changes to `infra/docker/postgres/init` need the Postgres volume recreated.
+Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS, owns nothing); migrations run as `evidence_owner`. Every new table in `public` needs RLS and a policy (a catalog test enforces this); tenant policies use the helpers in `packages/db/src/schema/rls.ts`. Changes to `infra/docker/postgres/init` need the Postgres volume recreated. Tenant data access: API handlers use `TenantDb.tx` (the request's transaction, set by `TenantTransactionInterceptor` from `request.tenantContext`); worker jobs use `runTenantJob`; both go through `withTenantContext` in `packages/db`. Never query through the raw pool in request or job code. Integration tests share `evidence_test`, so each test file creates and deletes only its own fixtures (no `truncate`).
 
 ## Working style
 

@@ -5,16 +5,18 @@
   "type": "module",
   "scripts": {
     "build": "nest build",
-    "dev": "nest start --watch --exec \"node --env-file-if-exists=../../.env\"",
-    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "dev": "nest start --watch --exec \"node --env-file-if-exists=.env\"",
+    "start": "node --env-file-if-exists=.env dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
+    "@evidence/db": "workspace:*",
     "@evidence/shared": "workspace:*",
     "@nestjs/common": "12.1.2",
     "@nestjs/core": "12.1.2",
+    "drizzle-orm": "0.45.4",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "zod": "4.6.6"

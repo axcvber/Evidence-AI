@@ -1,12 +1,7 @@
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 import type { NextConfig } from 'next';
 import { validateWebEnv } from './src/env';
 
-// One .env at the repo root serves compose and every app. Real deployments inject env vars directly.
-const rootEnvFile = path.resolve(process.cwd(), '../../.env');
-if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
-
+// Next loads apps/web/.env.local itself; fail fast here if anything is missing or malformed.
 validateWebEnv();
 
 const nextConfig: NextConfig = {

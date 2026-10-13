@@ -13,7 +13,7 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 - [x] **1.1 Monorepo.** Turborepo + pnpm with `apps/web`, `apps/api`, `apps/worker`, `packages/db`, `packages/shared`, `packages/ai`, `packages/evals`. Shared tsconfig (strict), ESLint/Prettier or Biome, Vitest config.
 - [x] **1.2 Local infrastructure.** Docker Compose: Postgres with pgvector, Redis, MinIO, Langfuse. `.env.example` and env validation with Zod in each app.
 - [x] **1.3 Database core.** Drizzle schema for `tenants`, `users`, `memberships` (role), `groups`, `group_members`, `audit_log`. Migrations. RLS policies on tenant tables using `app.tenant_id`.
-- [ ] **1.4 Tenant context.** NestJS middleware/interceptor that opens a transaction and sets `app.tenant_id` per request; helper for workers to do the same per job. Integration test: tenant A cannot read tenant B rows even with a raw query that omits `WHERE tenant_id`.
+- [x] **1.4 Tenant context.** NestJS middleware/interceptor that opens a transaction and sets `app.tenant_id` per request; helper for workers to do the same per job. Integration test: tenant A cannot read tenant B rows even with a raw query that omits `WHERE tenant_id`.
 - [ ] **1.5 Auth.** Better Auth with the organizations plugin; sign up, sign in, create workspace, invite by email, accept invite. Session shared between web and API.
 - [ ] **1.6 Roles.** `@Roles()` decorator + guard for owner/admin/editor/viewer. Tests for each role boundary.
 - [ ] **1.7 Web shell.** Next.js app with auth pages, onboarding (create workspace), app layout with sidebar and workspace switcher, empty pages for Ask, Search, Documents, Settings, Evals.

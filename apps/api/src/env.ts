@@ -4,10 +4,16 @@ import { z } from 'zod';
 export const apiEnvSchema = serverEnvSchema.extend({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   WEB_ORIGIN: z.url({ protocol: /^https?$/ }),
+  // Swagger UI exposes the full API surface, so it is off in production unless enabled explicitly.
+  API_DOCS_ENABLED: z.stringbool().optional(),
 });
 
 export type ApiEnv = z.output<typeof apiEnvSchema>;
 
 export function loadApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
   return parseEnv(apiEnvSchema, source);
+}
+
+export function apiDocsEnabled(env: ApiEnv): boolean {
+  return env.API_DOCS_ENABLED ?? env.NODE_ENV !== 'production';
 }

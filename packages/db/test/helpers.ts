@@ -7,6 +7,8 @@ const env = loadTestEnv();
 export const ownerPool = new pg.Pool({ connectionString: env.TEST_DATABASE_OWNER_URL, max: 2 });
 /** Application connection: everything under test runs through this role. */
 export const appPool = new pg.Pool({ connectionString: env.TEST_DATABASE_URL, max: 4 });
+/** Better Auth's connection role. */
+export const authPool = new pg.Pool({ connectionString: env.TEST_AUTH_DATABASE_URL, max: 2 });
 
 export interface AppContext {
   tenantId?: string;

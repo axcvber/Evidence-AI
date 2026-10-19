@@ -1,42 +1,33 @@
-import 'reflect-metadata';
 import { Server } from 'node:http';
-import { INestApplication } from '@nestjs/common';
 import { OpenAPIObject } from '@nestjs/swagger';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module.js';
-import { setupApiDocs } from '../src/docs/api-docs.js';
 import { apiDocsEnabled, ApiEnv } from '../src/env.js';
-import { testEnv } from './support/env.js';
+import { createTestApp, TestApp } from './support/app.js';
 
-let app: INestApplication<Server> | undefined;
+let t: TestApp | undefined;
 
-async function startApp({ docs }: { docs: boolean }): Promise<INestApplication<Server>> {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule.register({ databaseUrl: testEnv.TEST_DATABASE_URL })],
-  }).compile();
-  app = moduleRef.createNestApplication({ logger: false });
-  if (docs) setupApiDocs(app);
-  await app.init();
-  return app;
+async function startApp({ docs }: { docs: boolean }): Promise<Server> {
+  t = await createTestApp({ docs });
+  return t.server;
 }
 
 afterEach(async () => {
-  await app?.close();
-  app = undefined;
+  await t?.app.close();
+  t = undefined;
 });
 
 describe('API docs', () => {
   it('serves an OpenAPI document that describes the routes', async () => {
-    const server = (await startApp({ docs: true })).getHttpServer();
-    const response = await request(server).get('/docs-json').expect(200);
+    const server = await startApp({ docs: true });
+    const response = await request(server).get('/api/docs-json').expect(200);
     const document = response.body as OpenAPIObject;
-    const health = document.paths['/health']?.get;
+    const health = document.paths['/api/health']?.get;
 
     expect(document.openapi).toMatch(/^3\./);
     expect(document.info.title).toBe('Evidence AI API');
     expect(health?.operationId).toBe('Health_check');
+    expect(document.paths['/api/me']?.get?.operationId).toBe('Me_me');
     // The response schema is generated from the Zod schema in health.schema.ts.
     expect(health?.responses['200']).toMatchObject({
       content: {
@@ -53,18 +44,18 @@ describe('API docs', () => {
   });
 
   it('serves Swagger UI', async () => {
-    const server = (await startApp({ docs: true })).getHttpServer();
-    const response = await request(server).get('/docs').expect(200);
+    const server = await startApp({ docs: true });
+    const response = await request(server).get('/api/docs').expect(200);
 
     expect(response.headers['content-type']).toContain('text/html');
     expect(response.text).toContain('swagger');
   });
 
   it('serves nothing when docs are disabled', async () => {
-    const server = (await startApp({ docs: false })).getHttpServer();
+    const server = await startApp({ docs: false });
 
-    await request(server).get('/docs-json').expect(404);
-    await request(server).get('/docs').expect(404);
+    await request(server).get('/api/docs-json').expect(404);
+    await request(server).get('/api/docs').expect(404);
   });
 });
 

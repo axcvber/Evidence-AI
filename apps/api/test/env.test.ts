@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { testApiEnv } from './support/env.js';
+
+describe('API env', () => {
+  it('allows logging emails instead of sending them outside production', () => {
+    expect(testApiEnv({ NODE_ENV: 'development' }).RESEND_API_KEY).toBeUndefined();
+  });
+
+  it('requires a Resend key in production', () => {
+    expect(() => testApiEnv({ NODE_ENV: 'production' })).toThrow(/RESEND_API_KEY/);
+    expect(testApiEnv({ NODE_ENV: 'production', RESEND_API_KEY: 're_test' }).RESEND_API_KEY).toBe(
+      're_test',
+    );
+  });
+
+  it('rejects a short auth secret', () => {
+    expect(() => testApiEnv({ BETTER_AUTH_SECRET: 'too-short' })).toThrow(/BETTER_AUTH_SECRET/);
+  });
+
+  it.each(['Evidence AI <evidence@dev.axlisovsky.com>', 'evidence@dev.axlisovsky.com'])(
+    'accepts EMAIL_FROM %s',
+    (from) => {
+      expect(testApiEnv({ EMAIL_FROM: from }).EMAIL_FROM).toBe(from);
+    },
+  );
+
+  it.each(['Evidence AI', 'Evidence AI <not-an-email>', '<>'])('rejects EMAIL_FROM %s', (from) => {
+    expect(() => testApiEnv({ EMAIL_FROM: from })).toThrow(/EMAIL_FROM/);
+  });
+});

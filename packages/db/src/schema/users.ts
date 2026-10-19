@@ -1,11 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { boolean, check, pgPolicy, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { createdAt, updatedAt } from './columns.js';
-import { appRole, currentTenantId, currentUserId } from './rls.js';
+import { appRole, authFullAccessPolicy, currentTenantId, currentUserId } from './rls.js';
 
 // Users are global (one account, many workspaces), so there is no tenant_id. Visibility is
 // limited to yourself and members of the current tenant. The app role cannot insert or
-// delete users; that is the auth layer's job (step 1.5).
+// delete users; that is Better Auth's job, through the auth role.
 export const users = pgTable(
   'users',
   {
@@ -30,6 +30,7 @@ export const users = pgTable(
       using: sql`${t.id} = ${currentUserId}`,
       withCheck: sql`${t.id} = ${currentUserId}`,
     }),
+    authFullAccessPolicy(),
   ],
 );
 

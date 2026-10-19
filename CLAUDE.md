@@ -17,7 +17,8 @@ Full context: `docs/ARCHITECTURE.md` (architecture, data model, features, pages,
 - `packages/ai`: provider registry, embeddings, reranker, prompt templates, citation verification
 - `packages/evals`: eval runner, metrics, CLI used locally and in CI
 - Data: PostgreSQL + pgvector + built-in full-text search; Redis (BullMQ, cache, rate limits); S3 (MinIO locally)
-- Auth: Better Auth with the organizations plugin
+- Auth: Better Auth with the organizations plugin, running inside `apps/api` at `/api/auth`; the web app proxies `/api/*` so the session cookie is first-party
+- Email: Resend (official `resend` SDK) behind an `EmailSender` interface; without `RESEND_API_KEY` (local dev only) emails are logged by the API
 - Reranker: Cohere Rerank. Embeddings: OpenAI text-embedding-3-small (behind an interface)
 - LLM providers: OpenAI, Anthropic, Google through the AI SDK provider registry; model chosen per workspace
 - Observability: Langfuse (LLM traces), Sentry, OpenTelemetry
@@ -52,7 +53,7 @@ First run: `pnpm install && pnpm env:init && pnpm infra:up && pnpm db:migrate`. 
 Env files: one per workspace, each with a committed `.env.example`; `pnpm env:init` creates missing ones and never overwrites. Root `.env` is Docker Compose only (no app reads it); `apps/api/.env`, `apps/worker/.env`, `apps/web/.env.local` (loaded natively by Next) and `packages/db/.env` (owner + test DB URLs). Each process loads only its own file and validates it with Zod; CI and AWS inject variables directly. When adding a variable, add it to the right `.env.example` and that app's env schema.
 
 - `pnpm dev` – api (:4000), worker and web (:3000) in watch mode; needs `pnpm infra:up` first
-- API docs – Swagger UI at http://localhost:4000/docs, OpenAPI JSON at `/docs-json` (on by default outside production; `API_DOCS_ENABLED` overrides). Document every endpoint: `@ApiTags`, `@ApiOperation`, and Zod schemas via `standardSchema` on response decorators (`z.toJSONSchema()` for `@ApiBody`)
+- API docs – Swagger UI at http://localhost:3000/api/docs (through the web proxy, so your session cookie is sent) or :4000/api/docs, OpenAPI JSON at `/api/docs-json` (on by default outside production; `API_DOCS_ENABLED` overrides). Document every endpoint: `@ApiTags`, `@ApiOperation`, and Zod schemas via `standardSchema` on response decorators (`z.toJSONSchema()` for `@ApiBody`)
 - `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`
 - `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). `packages/db` RLS tests need `pnpm infra:up` and run against the `evidence_test` database
 - `pnpm infra:up` / `pnpm infra:down` – Docker Compose: Postgres+pgvector (:5440), Redis (:6390), MinIO (:9000, console :9001), Langfuse (:3100), ClickHouse (internal)
@@ -62,7 +63,7 @@ Env files: one per workspace, each with a committed `.env.example`; `pnpm env:in
 - `pnpm db:migrate` – apply migrations as `evidence_owner` (`DATABASE_OWNER_URL`)
 - `pnpm db:seed` (not yet created; step 2.9)
 
-Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS, owns nothing); migrations run as `evidence_owner`. Every new table in `public` needs RLS and a policy (a catalog test enforces this); tenant policies use the helpers in `packages/db/src/schema/rls.ts`. Changes to `infra/docker/postgres/init` need the Postgres volume recreated. Tenant data access: API handlers use `TenantDb.tx` (the request's transaction, set by `TenantTransactionInterceptor` from `request.tenantContext`); worker jobs use `runTenantJob`; both go through `withTenantContext` in `packages/db`. Never query through the raw pool in request or job code. Integration tests share `evidence_test`, so each test file creates and deletes only its own fixtures (no `truncate`).
+Notes: pnpm enforces a minimum release age on packages; pin to an older release rather than adding `minimumReleaseAgeExclude` entries. The apps connect to Postgres as `evidence_app` (no superuser, no BYPASSRLS, owns nothing); migrations run as `evidence_owner`. Every new table in `public` needs RLS and a policy (a catalog test enforces this); tenant policies use the helpers in `packages/db/src/schema/rls.ts`. Changes to `infra/docker/postgres/init` need the Postgres volume recreated. Tenant data access: API handlers use `TenantDb.tx` (the request's transaction, set by `TenantTransactionInterceptor` from `request.tenantContext`); worker jobs use `runTenantJob`; both go through `withTenantContext` in `packages/db`. Never query through the raw pool in request or job code. Every API route requires a session (global `AuthGuard`) unless marked `@Public()`; the guard re-checks the active workspace membership on every request. Database roles: `evidence_app` (API/worker, RLS-scoped), `evidence_auth` (Better Auth only: auth tables, nothing else), `evidence_owner` (migrations). Integration tests share `evidence_test`, so each test file creates and deletes only its own fixtures (no `truncate`).
 
 ## Working style
 

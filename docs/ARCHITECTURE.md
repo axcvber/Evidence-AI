@@ -41,6 +41,7 @@ One PostgreSQL database holds documents, vectors, permissions and eval results, 
 | ORM / migrations | Drizzle | Typed SQL, easy raw queries for pgvector and full-text ranking |
 | Tenant isolation | Postgres Row-Level Security + tenant\_id on every table | A missing WHERE clause cannot leak another tenant's data |
 | Auth | Better Auth (organizations plugin) | Open source, self-hosted; orgs, roles and invites live in your own Postgres, so the permission model is your code |
+| Email | Resend | Verification and invitation emails through a simple API; behind an interface so it can be swapped |
 | File storage | AWS S3 (MinIO locally) | Original files and versions; presigned uploads |
 | Parsing | unpdf + mammoth in Node; optional Docling sidecar for tables and scans | Stays in TypeScript; the sidecar handles tables and scans |
 | Embeddings | OpenAI text-embedding-3-small (Cohere or Voyage as a comparison) | Behind an interface so you can benchmark models in evals |
@@ -83,6 +84,7 @@ The API never queries without a tenant context, and Postgres Row-Level Security 
 
 - **Tenant isolation:** every table has `tenant_id`. The API sets the tenant on the database session, and RLS policies reject any row from another tenant.
 - **Roles:** Owner, Admin, Editor, Viewer at the workspace level (who can upload, manage users, run evals).
+- **Database roles:** the API and workers connect as an application role that cannot bypass RLS. Better Auth uses a separate role whose policies and grants cover only the auth tables (users, sessions, accounts, workspaces, memberships, invitations), never documents or chunks. Migrations run as the schema owner.
 - **Document ACL:** each document is visible to everyone in the workspace, or to selected groups and users. The allowed group and user IDs are copied onto each chunk and indexed.
 - **Pre-filter, never post-filter:** permissions are applied inside the retrieval SQL. Filtering after retrieval can leak text through the LLM and also leaves too few results.
 - **ACL changes:** editing a document's sharing enqueues a job that updates its chunks; until it finishes, the document is hidden from search (fail closed).

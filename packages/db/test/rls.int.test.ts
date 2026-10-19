@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { appPool, asApp, ownerPool, PG } from './helpers.js';
+import { appPool, asApp, authPool, ownerPool, PG } from './helpers.js';
 
 // Fixed ids keep failures readable.
 const tenantA = '00000000-0000-4000-8000-00000000000a';
@@ -10,7 +10,13 @@ const carol = '00000000-0000-4000-8000-0000000ca201'; // member of A and B
 const groupA = '00000000-0000-4000-8000-0000000064a0';
 const groupB = '00000000-0000-4000-8000-0000000064b0';
 
-const tenantTables = ['memberships', 'groups', 'group_members', 'audit_log'] as const;
+const tenantTables = [
+  'memberships',
+  'groups',
+  'group_members',
+  'audit_log',
+  'invitations',
+] as const;
 
 beforeAll(async () => {
   // Other packages' suites share evidence_test, so only this file's fixtures are reset.
@@ -39,11 +45,14 @@ beforeAll(async () => {
     insert into audit_log (tenant_id, actor_user_id, action, target_type) values
       ('${tenantA}', '${alice}', 'group.created', 'group'),
       ('${tenantB}', '${bob}', 'group.created', 'group');
+    insert into invitations (tenant_id, email, role, inviter_id, expires_at) values
+      ('${tenantA}', 'new-a@a.test', 'viewer', '${alice}', now() + interval '7 days'),
+      ('${tenantB}', 'new-b@b.test', 'editor', '${bob}', now() + interval '7 days');
   `);
 });
 
 afterAll(async () => {
-  await Promise.all([ownerPool.end(), appPool.end()]);
+  await Promise.all([ownerPool.end(), appPool.end(), authPool.end()]);
 });
 
 async function tenantIdsIn(table: string, context: Parameters<typeof asApp>[0]) {
@@ -273,5 +282,67 @@ describe('catalog guards', () => {
     await expect(
       appPool.query('alter table groups disable row level security'),
     ).rejects.toMatchObject({ code: PG.insufficientPrivilege });
+  });
+});
+
+describe('auth secrets are closed to the app role', () => {
+  it.each(['sessions', 'accounts', 'verifications'])('denies any access to %s', async (table) => {
+    await expect(
+      asApp({ tenantId: tenantA, userId: alice }, (client) =>
+        client.query(`select * from ${table}`),
+      ),
+    ).rejects.toMatchObject({ code: PG.insufficientPrivilege });
+  });
+});
+
+describe('the auth role (Better Auth) only reaches auth tables', () => {
+  it.each(['groups', 'group_members', 'audit_log'])('denies reading %s', async (table) => {
+    await expect(authPool.query(`select * from ${table}`)).rejects.toMatchObject({
+      code: PG.insufficientPrivilege,
+    });
+  });
+
+  it('denies writing tenant data', async () => {
+    await expect(
+      authPool.query('insert into groups (tenant_id, name) values ($1, $2)', [tenantA, 'Sneaky']),
+    ).rejects.toMatchObject({ code: PG.insufficientPrivilege });
+  });
+
+  it('has no table privileges beyond the auth tables', async () => {
+    const { rows } = await authPool.query<{ table_name: string }>(`
+      select distinct table_name from information_schema.table_privileges
+      where grantee = 'evidence_auth' and table_schema = 'public'
+      order by table_name
+    `);
+    expect(rows.map((row) => row.table_name)).toEqual([
+      'accounts',
+      'invitations',
+      'memberships',
+      'sessions',
+      'tenants',
+      'users',
+      'verifications',
+    ]);
+  });
+
+  it('can read across tenants on the auth tables (sign-in and workspace lists need it)', async () => {
+    const { rows } = await authPool.query<{ tenant_id: string }>(
+      'select distinct tenant_id from memberships where tenant_id = any($1)',
+      [[tenantA, tenantB]],
+    );
+    expect(new Set(rows.map((row) => row.tenant_id))).toEqual(new Set([tenantA, tenantB]));
+  });
+
+  it('cannot bypass RLS or own anything', async () => {
+    const { rows } = await authPool.query<{
+      rolsuper: boolean;
+      rolbypassrls: boolean;
+      owned: number;
+    }>(`
+      select r.rolsuper, r.rolbypassrls,
+             (select count(*)::int from pg_class c where c.relowner = r.oid) as owned
+      from pg_roles r where r.rolname = current_user
+    `);
+    expect(rows[0]).toEqual({ rolsuper: false, rolbypassrls: false, owned: 0 });
   });
 });

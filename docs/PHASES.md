@@ -1,6 +1,6 @@
 # Evidence AI – Development Phases
 
-Five phases. Each phase ends with a gate: don't start the next phase until the gate passes and the slice is deployed (from Phase 1 onward).
+Five phases. Each phase ends with a gate: don't start the next phase until the gate passes. Phases 1–4 run locally (Docker Compose) with CI on every push; deployment to AWS happens in Phase 5.
 
 Each step is sized for one Claude Code session. Tick steps as they are done.
 
@@ -8,19 +8,19 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 
 ## Phase 1 – Foundation
 
-**Goal:** a secure multi-tenant skeleton running locally and on AWS.
+**Goal:** a secure multi-tenant skeleton with role-based access and a well-defined API, running locally.
 
 - [x] **1.1 Monorepo.** Turborepo + pnpm with `apps/web`, `apps/api`, `apps/worker`, `packages/db`, `packages/shared`, `packages/ai`, `packages/evals`. Shared tsconfig (strict), ESLint/Prettier or Biome, Vitest config.
 - [x] **1.2 Local infrastructure.** Docker Compose: Postgres with pgvector, Redis, MinIO, Langfuse. `.env.example` and env validation with Zod in each app.
 - [x] **1.3 Database core.** Drizzle schema for `tenants`, `users`, `memberships` (role), `groups`, `group_members`, `audit_log`. Migrations. RLS policies on tenant tables using `app.tenant_id`.
 - [x] **1.4 Tenant context.** NestJS middleware/interceptor that opens a transaction and sets `app.tenant_id` per request; helper for workers to do the same per job. Integration test: tenant A cannot read tenant B rows even with a raw query that omits `WHERE tenant_id`.
-- [ ] **1.5 Auth.** Better Auth with the organizations plugin; sign up, sign in, create workspace, invite by email, accept invite. Session shared between web and API.
+- [x] **1.5 Auth.** Better Auth with the organizations plugin; sign up, sign in, create workspace, invite by email, accept invite. Session shared between web and API.
 - [ ] **1.6 Roles.** `@Roles()` decorator + guard for owner/admin/editor/viewer. Tests for each role boundary.
-- [ ] **1.7 Web shell.** Next.js app with auth pages, onboarding (create workspace), app layout with sidebar and workspace switcher, empty pages for Ask, Search, Documents, Settings, Evals.
-- [ ] **1.8 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests (Postgres and Redis as services).
-- [ ] **1.9 AWS baseline.** Terraform: VPC, ECR, ECS Fargate cluster and services (web, api, worker), RDS Postgres with pgvector, ElastiCache Redis, S3, ALB, CloudFront, Secrets Manager. GitHub OIDC role. Deploy workflow on push to `main` with migrations as a release step.
+- [ ] **1.7 API design.** Conventions every endpoint follows: request validation (body, query, params) with Zod schemas from `packages/shared`, with OpenAPI generated from the same schemas; one error shape (`statusCode`, `code`, `message`, optional `details`) from the domain exception filter; cursor pagination; workspace-scoped resource routes under `/api`; request IDs in responses and logs; Better Auth endpoints included in the API docs. First resources built on these conventions and the 1.6 roles: members (list, change role, remove), invitations (list, cancel) and groups (CRUD, add/remove members), with integration tests for every endpoint and role.
+- [ ] **1.8 Web shell.** Next.js app with auth pages, onboarding (create workspace), app layout with sidebar and workspace switcher, empty pages for Ask, Search, Documents, Settings, Evals.
+- [ ] **1.9 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests (Postgres and Redis as services).
 
-**Gate:** a user can sign up, create a workspace and invite a teammate on the deployed URL; isolation and role tests pass in CI.
+**Gate:** locally, a user can sign up, create a workspace, invite a teammate and manage members and groups according to their role; isolation and role tests pass in CI.
 
 ---
 
@@ -81,13 +81,14 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 
 **Goal:** a product a recruiter can try in one click, and a story you can tell.
 
-- [ ] **5.1 Observability.** Sentry in web/API/worker, OpenTelemetry traces, Langfuse dashboards; structured logs.
-- [ ] **5.2 Usage page.** Questions, tokens, cost, p95 latency, top unanswered questions per workspace; cost limit setting and a warning at 80% of the limit.
-- [ ] **5.3 Hardening.** Security headers, CSRF, input limits, file scanning limits, backup and restore check for RDS, load test of the chat endpoint (record p50/p95).
-- [ ] **5.4 Public demo.** One-click demo login into the seeded workspace (read-only for destructive actions), nightly reset job.
-- [ ] **5.5 Landing page.** Value proposition, demo video, eval results table, architecture image, "Try the demo".
-- [ ] **5.6 Excalidraw diagrams.** System architecture, ingestion pipeline, query pipeline, permission check, data model, eval loop, AWS deployment. Store `.excalidraw` sources and exported SVGs in `docs/diagrams/`.
-- [ ] **5.7 README as a case study.** Problem, architecture, security model, eval results and experiments, tradeoffs, what failed, what's next; links to demo and video.
-- [ ] **5.8 Demo video and write-up.** 2–3 minute walkthrough; one technical blog post (for example, "How hybrid search and reranking moved recall@10 from X to Y").
+- [ ] **5.1 AWS baseline and deploy.** Terraform: VPC, ECR, ECS Fargate cluster and services (web, api, worker), RDS Postgres with pgvector, ElastiCache Redis, S3, ALB, CloudFront (routing `/api/*` to the API), Secrets Manager, Resend sending domain. Bootstrap of the database roles (`evidence_owner`, `evidence_app`, `evidence_auth`) on RDS. GitHub OIDC role. Deploy workflow on push to `main` with migrations as a release step.
+- [ ] **5.2 Observability.** Sentry in web/API/worker, OpenTelemetry traces, Langfuse dashboards; structured logs.
+- [ ] **5.3 Usage page.** Questions, tokens, cost, p95 latency, top unanswered questions per workspace; cost limit setting and a warning at 80% of the limit.
+- [ ] **5.4 Hardening.** Security headers, CSRF, input limits, file scanning limits, backup and restore check for RDS, load test of the chat endpoint (record p50/p95).
+- [ ] **5.5 Public demo.** One-click demo login into the seeded workspace (read-only for destructive actions), nightly reset job.
+- [ ] **5.6 Landing page.** Value proposition, demo video, eval results table, architecture image, "Try the demo".
+- [ ] **5.7 Excalidraw diagrams.** System architecture, ingestion pipeline, query pipeline, permission check, data model, eval loop, AWS deployment. Store `.excalidraw` sources and exported SVGs in `docs/diagrams/`.
+- [ ] **5.8 README as a case study.** Problem, architecture, security model, eval results and experiments, tradeoffs, what failed, what's next; links to demo and video.
+- [ ] **5.9 Demo video and write-up.** 2–3 minute walkthrough; one technical blog post (for example, "How hybrid search and reranking moved recall@10 from X to Y").
 
 **Gate:** public demo is live, README is complete, video is published.

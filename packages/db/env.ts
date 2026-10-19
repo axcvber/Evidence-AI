@@ -16,7 +16,11 @@ export function loadMigrationEnv() {
 
 export function loadTestEnv() {
   return parseEnv(
-    z.object({ TEST_DATABASE_URL: postgresUrl, TEST_DATABASE_OWNER_URL: postgresUrl }),
+    z.object({
+      TEST_DATABASE_URL: postgresUrl,
+      TEST_DATABASE_OWNER_URL: postgresUrl,
+      TEST_AUTH_DATABASE_URL: postgresUrl,
+    }),
     process.env,
   );
 }

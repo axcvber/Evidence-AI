@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { check, jsonb, numeric, pgPolicy, pgTable, text, uuid } from 'drizzle-orm/pg-core';
 import { createdAt, updatedAt } from './columns.js';
-import { appRole, currentUserId, tenantIsolationPolicy } from './rls.js';
+import { appRole, authFullAccessPolicy, currentUserId, tenantIsolationPolicy } from './rls.js';
 
 export const tenants = pgTable(
   'tenants',
@@ -10,6 +10,8 @@ export const tenants = pgTable(
     name: text().notNull(),
     slug: text().notNull().unique(),
     logo: text(),
+    // Better Auth's organization metadata (JSON string). App settings live in `settings`.
+    metadata: text(),
     plan: text().notNull().default('free'),
     settings: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     monthlyCostLimitUsd: numeric({ precision: 12, scale: 2 }).notNull().default('50'),
@@ -25,6 +27,7 @@ export const tenants = pgTable(
       to: appRole,
       using: sql`exists (select 1 from public.memberships m where m.tenant_id = ${t.id} and m.user_id = ${currentUserId})`,
     }),
+    authFullAccessPolicy(),
   ],
 );
 

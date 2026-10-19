@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, pgEnum, pgPolicy, pgTable, unique, uuid } from 'drizzle-orm/pg-core';
 import { createdAt } from './columns.js';
-import { appRole, currentUserId, tenantIsolationPolicy } from './rls.js';
+import { appRole, authFullAccessPolicy, currentUserId, tenantIsolationPolicy } from './rls.js';
 import { tenants } from './tenants.js';
 import { users } from './users.js';
 
@@ -31,6 +31,7 @@ export const memberships = pgTable(
       to: appRole,
       using: sql`${t.userId} = ${currentUserId}`,
     }),
+    authFullAccessPolicy(),
   ],
 );
 

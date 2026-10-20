@@ -21,7 +21,7 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 - [x] **1.9 Account lifecycle and social sign-in.** Forgot/reset password, change password, change email (verified), resend verification, edit profile, list and revoke sessions, delete account (confirmed by email, blocked while sole owner of a workspace); Google and GitHub sign-in with safe account linking. Pages for each flow; tests for each flow and its abuse cases.
 - [x] **1.10 Workspace administration.** Members (list, change role, remove, leave), invitations (list, resend, cancel, reject, invitations for me), workspace settings (rename, delete by owner), last-owner protection and ownership transfer; groups as a Nest resource on the 1.8 contracts. Pages under workspace settings; tests for every endpoint and role.
 - [x] **1.11 End-to-end tests.** Playwright with an email outbox (dev/test only): sign-up to accept invite, password reset, change email, session revocation, and what each seeded role can see and do.
-- [ ] **1.12 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests (Postgres and Redis as services), end-to-end tests.
+- [x] **1.12 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests and end-to-end tests, with Postgres and Redis started from the project's Docker Compose file (same roles and init script as locally).
 
 **Gate:** locally, every account flow works and each of the four seeded roles can be signed into to see what it can and cannot do; isolation, role and end-to-end tests pass in CI.
 

@@ -12,6 +12,7 @@ import { EMAIL_SENDER, EmailSender } from '../email/email-sender.js';
 import { AuthOptions, createAuth } from './auth.js';
 import { AuthGuard } from './auth.guard.js';
 import { AUTH } from './auth.tokens.js';
+import { RolesGuard } from './roles.guard.js';
 
 export { AUTH };
 
@@ -50,7 +51,9 @@ export class AuthModule {
           inject: [EMAIL_SENDER],
           useFactory: (emailSender: EmailSender) => createAuth({ ...authOptions, db, emailSender }),
         },
+        // Global guards run in registration order: authenticate first, then check the role.
         { provide: APP_GUARD, useClass: AuthGuard },
+        { provide: APP_GUARD, useClass: RolesGuard },
       ],
       exports: [AUTH],
     };

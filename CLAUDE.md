@@ -40,9 +40,9 @@ Use current stable versions. Check official docs for APIs that change often (Nex
 ## Conventions
 
 - NestJS: one module per domain (auth, tenants, documents, search, chat, evals, usage, audit). Guards for auth and roles; an interceptor or middleware sets tenant context.
-- Roles: owner, admin, editor, viewer. Enforce with a `@Roles()` decorator + guard.
+- Roles: owner, admin, editor, viewer, ranked in that order. `@Roles('editor')` means "editor or higher" (`hasAtLeastRole` in `packages/shared`); put it on the controller and override per method. Routes without `@Roles` are open to any signed-in user. `RolesGuard` runs after `AuthGuard`.
+- Errors: throw subclasses of `DomainError` (`apps/api/src/common/domain-error.ts`) with a status, a stable `code` and a client-safe message; `DomainExceptionFilter` renders `{ statusCode, code, message }`.
 - DB: migrations only through Drizzle Kit; raw SQL allowed for pgvector, full-text and RLS, kept in `packages/db`.
-- Errors: typed domain errors mapped to HTTP responses in one exception filter.
 - Tests: every new endpoint gets an integration test; every security rule gets a test that tries to break it.
 - Keep functions small, name things plainly, and write a short comment only where the reason is not obvious.
 

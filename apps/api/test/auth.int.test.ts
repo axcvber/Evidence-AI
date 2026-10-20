@@ -1,6 +1,7 @@
 import { createDb } from '@evidence/db';
 import type { MeResponse } from '@evidence/shared';
 import { sql } from 'drizzle-orm';
+import { Redis } from 'ioredis';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, TestApp } from './support/app.js';
@@ -17,6 +18,18 @@ import { testEnv } from './support/env.js';
 
 let t: TestApp;
 const owner = createDb(testEnv.TEST_DATABASE_OWNER_URL, { max: 1 });
+const redis = new Redis(testEnv.TEST_REDIS_URL);
+
+/** The raw session token of a user's latest session, via the Postgres copy. */
+async function sessionToken(email: string): Promise<string> {
+  const result = await owner.db.execute<{ token: string }>(sql`
+    select s.token from sessions s join users u on u.id = s.user_id
+    where u.email = ${email} order by s.created_at desc limit 1
+  `);
+  const token = result.rows[0]?.token;
+  if (!token) throw new Error(`No session for ${email}`);
+  return token;
+}
 
 beforeAll(async () => {
   t = await createTestApp();
@@ -25,6 +38,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await t.app.close();
   await owner.pool.end();
+  redis.disconnect();
 });
 
 function invitationIdFrom(path: string): string {
@@ -225,16 +239,33 @@ describe('active workspace checks (AuthGuard)', () => {
     expect((me.body as MeResponse).activeWorkspace).toBeNull();
   });
 
-  it('refuses a session whose active workspace was tampered with in the database', async () => {
+  it('refuses a session whose active workspace was tampered with in Redis', async () => {
     const { tenantId: victimTenant } = await ownerWithWorkspace();
     const attackerEmail = uniqueEmail('attacker');
+    const attacker = await signUpVerified(t.server, t.emails, attackerEmail);
+
+    // Sessions are read from Redis; rewrite the attacker's stored session to point at the victim.
+    const key = `${t.env.AUTH_REDIS_KEY_PREFIX}${await sessionToken(attackerEmail)}`;
+    const raw = await redis.get(key);
+    if (!raw) throw new Error('Session not found in Redis');
+    const stored = JSON.parse(raw) as { session: Record<string, unknown> };
+    stored.session.activeOrganizationId = victimTenant;
+    await redis.set(key, JSON.stringify(stored), 'KEEPTTL');
+
+    await attacker.get('/api/me').expect(403);
+  });
+
+  it('ignores edits to the Postgres copy of a session (reads come from Redis)', async () => {
+    const { tenantId: victimTenant } = await ownerWithWorkspace();
+    const attackerEmail = uniqueEmail('db-attacker');
     const attacker = await signUpVerified(t.server, t.emails, attackerEmail);
 
     await owner.db.execute(sql`
       update sessions set active_tenant_id = ${victimTenant}
       where user_id = (select id from users where email = ${attackerEmail})
     `);
-    await attacker.get('/api/me').expect(403);
+    const me = await attacker.get('/api/me').expect(200);
+    expect((me.body as MeResponse).activeWorkspace).toBeNull();
   });
 
   it('locks out a member as soon as they are removed', async () => {

@@ -5,9 +5,10 @@ import { DomainExceptionFilter } from './common/domain-exception.filter.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EmailSender } from './email/email-sender.js';
 import { EmailModule } from './email/email.module.js';
-import { ApiEnv } from './env.js';
+import { ApiEnv, authRateLimitEnabled } from './env.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
+import { RedisModule } from './redis/redis.module.js';
 import { TenancyModule } from './tenancy/tenancy.module.js';
 
 export interface AppModuleOptions {
@@ -23,6 +24,7 @@ export class AppModule {
       module: AppModule,
       imports: [
         DatabaseModule.forRoot({ url: env.DATABASE_URL }),
+        RedisModule.forRoot({ url: env.REDIS_URL }),
         EmailModule.forRoot({
           resendApiKey: env.RESEND_API_KEY,
           from: env.EMAIL_FROM,
@@ -33,7 +35,12 @@ export class AppModule {
           secret: env.BETTER_AUTH_SECRET,
           baseUrl: env.BETTER_AUTH_URL,
           secureCookies: env.NODE_ENV === 'production',
-          rateLimit: env.NODE_ENV !== 'test',
+          redisKeyPrefix: env.AUTH_REDIS_KEY_PREFIX,
+          rateLimit: authRateLimitEnabled(env),
+          clientIp: {
+            header: env.CLIENT_IP_HEADER ?? 'x-forwarded-for',
+            trustedProxies: env.TRUSTED_PROXIES,
+          },
         }),
         TenancyModule,
         HealthModule,

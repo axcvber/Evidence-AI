@@ -40,7 +40,7 @@ One PostgreSQL database holds documents, vectors, permissions and eval results, 
 | Database | PostgreSQL + pgvector + built-in full-text search | Vectors, keyword index and ACLs in one place; hybrid search in one query |
 | ORM / migrations | Drizzle | Typed SQL, easy raw queries for pgvector and full-text ranking |
 | Tenant isolation | Postgres Row-Level Security + tenant\_id on every table | A missing WHERE clause cannot leak another tenant's data |
-| Auth | Better Auth (organizations plugin) | Open source, self-hosted; orgs, roles and invites live in your own Postgres, so the permission model is your code |
+| Auth | Better Auth (organizations plugin), server-side sessions in Redis with a copy in Postgres; email/password plus Google and GitHub | Open source, self-hosted; orgs, roles and invites live in your own Postgres, so the permission model is your code; any API instance can serve any session |
 | Email | Resend | Verification and invitation emails through a simple API; behind an interface so it can be swapped |
 | File storage | AWS S3 (MinIO locally) | Original files and versions; presigned uploads |
 | Parsing | unpdf + mammoth in Node; optional Docling sidecar for tables and scans | Stays in TypeScript; the sidecar handles tables and scans |
@@ -124,19 +124,22 @@ The MVP is the complete core loop: upload, search, cited answer, eval. v1 comple
 
 ## Pages and screens
 
-The app has 13 screens in four areas. A public demo workspace with sample documents and seeded users (Admin, HR, Engineering) supports one-click demo login.
+The app has 16 screens in five areas. A public demo workspace with sample documents and seeded users (Admin, HR, Engineering) supports one-click demo login.
 
 | Area | Page | Route | What it shows | Who sees it |
 | --- | --- | --- | --- | --- |
 | Public | Landing | / | Value, 60-second demo video, eval results, "Try the demo" | Everyone |
 | Public | Sign in / sign up | /login, /signup | Auth, accept invite | Everyone |
+| Public | Account recovery | /forgot-password, /reset-password, /verify-email | Reset password, confirm or resend email verification | Everyone |
+| Account | Account settings | /account/profile, /account/security, /account/sessions | Profile, password, email, connected Google/GitHub accounts, active sessions, delete account | Signed-in users |
 | Onboarding | Create workspace | /onboarding | Name, invite teammates, upload first documents | New owner |
 | Workspace | Ask (chat) | /w/\[ws\]/ask | Chat, streaming answer, citation panel with the source page highlighted | All roles |
 | Workspace | Conversations | /w/\[ws\]/history | Past chats, search, delete | All roles |
 | Workspace | Search | /w/\[ws\]/search | Hybrid search results with snippets and filters | All roles |
 | Workspace | Documents | /w/\[ws\]/documents | Collections, upload, status, sharing badge | All roles (upload: Editor+) |
 | Workspace | Document detail | /w/\[ws\]/documents/\[id\] | Preview, versions, chunks, who can access, re-index | Editor+ |
-| Admin | Members and groups | /w/\[ws\]/settings/members | Invite, roles, groups | Admin+ |
+| Admin | Members and groups | /w/\[ws\]/settings/members, /w/\[ws\]/settings/groups | Members, roles, invitations, groups | Admin+ (members list: all roles) |
+| Admin | Workspace settings | /w/\[ws\]/settings/workspace | Rename, transfer ownership, delete workspace | Admin+ (delete: Owner) |
 | Admin | Access review | /w/\[ws\]/settings/access | Which groups can see which documents; "view as user" check | Admin+ |
 | Admin | Usage and costs | /w/\[ws\]/settings/usage | Questions, tokens, cost, p95 latency, top unanswered questions | Admin+ |
 | Quality | Evals | /w/\[ws\]/evals | Datasets, runs, metric trends, run comparison | Admin+ |

@@ -8,11 +8,13 @@ import {
   users,
   verifications,
 } from '@evidence/db';
+import { redisStorage } from '@better-auth/redis-storage';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
 import { organization } from 'better-auth/plugins';
 import { workspaceRoleNames } from '@evidence/shared';
+import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { EmailSender } from '../email/email-sender.js';
 import { accessControl, workspaceRoles } from './access-control.js';
@@ -26,7 +28,11 @@ export interface AuthOptions {
   baseUrl: string;
   emailSender: EmailSender;
   secureCookies: boolean;
+  /** Sessions and rate limits are stored here, shared by every API instance. */
+  redis: Redis;
+  redisKeyPrefix: string;
   rateLimit: boolean;
+  clientIp: { header: string; trustedProxies?: string[] | undefined };
 }
 
 export const AUTH_BASE_PATH = '/api/auth';
@@ -61,20 +67,44 @@ export function createAuth(options: AuthOptions) {
     secret: options.secret,
     trustedOrigins: [baseUrl],
     telemetry: { enabled: false },
-    rateLimit: { enabled: options.rateLimit, window: 60, max: 100 },
+
+    // Server-side sessions: an opaque signed token in an HttpOnly cookie, the session itself in
+    // Redis (read on every request) with a copy in Postgres that survives a Redis restart.
+    // The cookie cache stays off so sign-out and revocation apply on the next request.
+    secondaryStorage: redisStorage({ client: options.redis, keyPrefix: options.redisKeyPrefix }),
+    session: {
+      modelName: 'sessions',
+      storeSessionInDatabase: true,
+      cookieCache: { enabled: false },
+    },
+    rateLimit: {
+      enabled: options.rateLimit,
+      storage: 'secondary-storage',
+      window: 60,
+      max: 100,
+      // Credential and email-sending endpoints get much tighter limits per client IP.
+      customRules: {
+        '/sign-in/email': { window: 60, max: 10 },
+        '/sign-up/email': { window: 60, max: 5 },
+        '/send-verification-email': { window: 60, max: 3 },
+      },
+    },
 
     database: drizzleAdapter(options.db, {
       provider: 'pg',
       schema: { users, sessions, accounts, verifications, tenants, memberships, invitations },
     }),
     user: { modelName: 'users' },
-    session: { modelName: 'sessions' },
     account: { modelName: 'accounts' },
     verification: { modelName: 'verifications' },
     advanced: {
       database: { generateId: 'uuid' },
       cookiePrefix: 'evidence',
       useSecureCookies: options.secureCookies,
+      ipAddress: {
+        ipAddressHeaders: [options.clientIp.header],
+        ...(options.clientIp.trustedProxies && { trustedProxies: options.clientIp.trustedProxies }),
+      },
     },
 
     emailAndPassword: {

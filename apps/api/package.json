@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@better-auth/redis-storage": "1.7.7",
     "@evidence/db": "workspace:*",
     "@evidence/shared": "workspace:*",
     "@nestjs/common": "12.1.2",
@@ -20,6 +21,7 @@
     "@nestjs/swagger": "12.0.2",
     "better-auth": "1.7.7",
     "drizzle-orm": "0.45.4",
+    "ioredis": "5.11.1",
     "reflect-metadata": "0.2.2",
     "resend": "6.32.1",
     "rxjs": "7.8.2",

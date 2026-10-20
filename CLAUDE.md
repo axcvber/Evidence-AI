@@ -17,7 +17,7 @@ Full context: `docs/ARCHITECTURE.md` (architecture, data model, features, pages,
 - `packages/ai`: provider registry, embeddings, reranker, prompt templates, citation verification
 - `packages/evals`: eval runner, metrics, CLI used locally and in CI
 - Data: PostgreSQL + pgvector + built-in full-text search; Redis (BullMQ, cache, rate limits); S3 (MinIO locally)
-- Auth: Better Auth with the organizations plugin, running inside `apps/api` at `/api/auth`; the web app proxies `/api/*` so the session cookie is first-party
+- Auth: Better Auth with the organizations plugin, running inside `apps/api` at `/api/auth`; the web app proxies `/api/*` so the session cookie is first-party. Server-side sessions (not JWT): opaque signed token in an HttpOnly cookie, session in Redis (`secondaryStorage`) with a copy in Postgres used as fallback; cookie cache off so revocation is immediate. Auth rate limits live in Redis, keyed by client IP (`CLIENT_IP_HEADER` / `TRUSTED_PROXIES`, required in production)
 - Email: Resend (official `resend` SDK) behind an `EmailSender` interface; without `RESEND_API_KEY` (local dev only) emails are logged by the API
 - Reranker: Cohere Rerank. Embeddings: OpenAI text-embedding-3-small (behind an interface)
 - LLM providers: OpenAI, Anthropic, Google through the AI SDK provider registry; model chosen per workspace
@@ -55,7 +55,7 @@ Env files: one per workspace, each with a committed `.env.example`; `pnpm env:in
 - `pnpm dev` – api (:4000), worker and web (:3000) in watch mode; needs `pnpm infra:up` first
 - API docs – Swagger UI at http://localhost:3000/api/docs (through the web proxy, so your session cookie is sent) or :4000/api/docs, OpenAPI JSON at `/api/docs-json` (on by default outside production; `API_DOCS_ENABLED` overrides). Document every endpoint: `@ApiTags`, `@ApiOperation`, and Zod schemas via `standardSchema` on response decorators (`z.toJSONSchema()` for `@ApiBody`)
 - `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`
-- `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). `packages/db` RLS tests need `pnpm infra:up` and run against the `evidence_test` database
+- `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). Needs `pnpm infra:up`: DB tests use the `evidence_test` database and API tests use Redis database 1 (`TEST_REDIS_URL`) with a unique key prefix per test app
 - `pnpm infra:up` / `pnpm infra:down` – Docker Compose: Postgres+pgvector (:5440), Redis (:6390), MinIO (:9000, console :9001), Langfuse (:3100), ClickHouse (internal)
 - `pnpm e2e` – Playwright (not yet created)
 - `pnpm eval` – run the eval suite (not yet created)

@@ -8,9 +8,18 @@ export const TEST_PASSWORD = 'correct horse battery staple';
 
 export type Agent = ReturnType<typeof request.agent>;
 
+/** A random client IP, so each simulated browser gets its own auth rate-limit budget. */
+export function randomClientIp(): string {
+  const octet = () => Math.floor(Math.random() * 250) + 1;
+  return `10.${octet()}.${octet()}.${octet()}`;
+}
+
 /** A cookie-keeping client that sends the web origin, like a browser behind the Next proxy. */
 export function browser(server: Server): Agent {
-  return request.agent(server).set('Origin', TEST_WEB_ORIGIN);
+  return request
+    .agent(server)
+    .set('Origin', TEST_WEB_ORIGIN)
+    .set('X-Forwarded-For', randomClientIp());
 }
 
 export function uniqueEmail(label: string): string {

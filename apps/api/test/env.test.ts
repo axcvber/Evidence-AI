@@ -7,10 +7,9 @@ describe('API env', () => {
   });
 
   it('requires a Resend key in production', () => {
-    expect(() => testApiEnv({ NODE_ENV: 'production' })).toThrow(/RESEND_API_KEY/);
-    expect(testApiEnv({ NODE_ENV: 'production', RESEND_API_KEY: 're_test' }).RESEND_API_KEY).toBe(
-      're_test',
-    );
+    const production = { NODE_ENV: 'production', CLIENT_IP_HEADER: 'x-forwarded-for' };
+    expect(() => testApiEnv(production)).toThrow(/RESEND_API_KEY/);
+    expect(testApiEnv({ ...production, RESEND_API_KEY: 're_test' }).RESEND_API_KEY).toBe('re_test');
   });
 
   it('rejects a short auth secret', () => {
@@ -26,5 +25,31 @@ describe('API env', () => {
 
   it.each(['Evidence AI', 'Evidence AI <not-an-email>', '<>'])('rejects EMAIL_FROM %s', (from) => {
     expect(() => testApiEnv({ EMAIL_FROM: from })).toThrow(/EMAIL_FROM/);
+  });
+
+  it('requires an explicit client IP header in production', () => {
+    const production = { NODE_ENV: 'production', RESEND_API_KEY: 're_test' };
+    expect(() => testApiEnv(production)).toThrow(/CLIENT_IP_HEADER/);
+    expect(
+      testApiEnv({ ...production, CLIENT_IP_HEADER: 'cloudfront-viewer-address' }),
+    ).toBeTruthy();
+  });
+
+  it('never allows turning auth rate limits off in production', () => {
+    expect(() =>
+      testApiEnv({
+        NODE_ENV: 'production',
+        RESEND_API_KEY: 're_test',
+        CLIENT_IP_HEADER: 'x-forwarded-for',
+        AUTH_RATE_LIMIT_ENABLED: 'false',
+      }),
+    ).toThrow(/AUTH_RATE_LIMIT_ENABLED/);
+  });
+
+  it('parses trusted proxies as a list', () => {
+    expect(testApiEnv({ TRUSTED_PROXIES: '10.0.0.1, 10.0.1.0/24' }).TRUSTED_PROXIES).toEqual([
+      '10.0.0.1',
+      '10.0.1.0/24',
+    ]);
   });
 });

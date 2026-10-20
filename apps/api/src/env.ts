@@ -22,6 +22,24 @@ export const apiEnvSchema = serverEnvSchema
     // Public origin the browser uses. The web app proxies /api/* to this API, so it is the web origin.
     BETTER_AUTH_URL: httpUrl,
 
+    // Sessions and auth rate limits live in Redis under this prefix.
+    AUTH_REDIS_KEY_PREFIX: z.string().min(1).default('evidence:auth:'),
+    // Rate limiting of /api/auth/* is on everywhere except tests, and cannot be turned off in production.
+    AUTH_RATE_LIMIT_ENABLED: z.stringbool().optional(),
+    // Header carrying the client IP for rate limits and session records, and the proxy hops
+    // that may appear in it (comma-separated IPs or CIDRs). Both are set explicitly in
+    // production, where the header depends on the load balancer in front of the API.
+    CLIENT_IP_HEADER: z.string().min(1).optional(),
+    TRUSTED_PROXIES: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(',')
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      ),
+
     RESEND_API_KEY: z.string().startsWith('re_').optional(),
     EMAIL_FROM: emailSender,
   })
@@ -34,6 +52,20 @@ export const apiEnvSchema = serverEnvSchema
         message: 'Required in production',
       });
     }
+    if (env.NODE_ENV === 'production' && !env.CLIENT_IP_HEADER) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['CLIENT_IP_HEADER'],
+        message: 'Required in production (the header your load balancer sets)',
+      });
+    }
+    if (env.NODE_ENV === 'production' && env.AUTH_RATE_LIMIT_ENABLED === false) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AUTH_RATE_LIMIT_ENABLED'],
+        message: 'Cannot be disabled in production',
+      });
+    }
   });
 
 export type ApiEnv = z.output<typeof apiEnvSchema>;
@@ -44,4 +76,10 @@ export function loadApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
 
 export function apiDocsEnabled(env: Pick<ApiEnv, 'NODE_ENV' | 'API_DOCS_ENABLED'>): boolean {
   return env.API_DOCS_ENABLED ?? env.NODE_ENV !== 'production';
+}
+
+export function authRateLimitEnabled(
+  env: Pick<ApiEnv, 'NODE_ENV' | 'AUTH_RATE_LIMIT_ENABLED'>,
+): boolean {
+  return env.AUTH_RATE_LIMIT_ENABLED ?? env.NODE_ENV !== 'test';
 }

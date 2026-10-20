@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { parseEnv } from '@evidence/shared';
@@ -15,6 +16,7 @@ export const testEnv = parseEnv(
     TEST_DATABASE_URL: postgresUrl,
     TEST_DATABASE_OWNER_URL: postgresUrl,
     TEST_AUTH_DATABASE_URL: postgresUrl,
+    TEST_REDIS_URL: z.url({ protocol: /^rediss?$/ }),
   }),
   process.env,
 );
@@ -27,7 +29,9 @@ export function testApiEnv(overrides: Partial<Record<string, string>> = {}): Api
     NODE_ENV: 'test',
     DATABASE_URL: testEnv.TEST_DATABASE_URL,
     AUTH_DATABASE_URL: testEnv.TEST_AUTH_DATABASE_URL,
-    REDIS_URL: 'redis://localhost:6390',
+    REDIS_URL: testEnv.TEST_REDIS_URL,
+    // Each test app gets its own key space so test files never see each other's sessions.
+    AUTH_REDIS_KEY_PREFIX: `evidence:test:${randomUUID()}:`,
     S3_REGION: 'us-east-1',
     S3_BUCKET: 'test',
     S3_ACCESS_KEY_ID: 'test',

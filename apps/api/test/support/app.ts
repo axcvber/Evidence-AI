@@ -13,15 +13,17 @@ export interface TestApp {
   app: NestExpressApplication;
   server: Server;
   emails: MemoryEmailSender;
+  env: ApiEnv;
 }
 
 /** Builds the API exactly like main.ts does, with emails captured in memory. */
 export async function createTestApp(
-  options: { docs?: boolean; controllers?: Type[]; env?: ApiEnv } = {},
+  options: { docs?: boolean; controllers?: Type[]; env?: ApiEnv; emails?: MemoryEmailSender } = {},
 ): Promise<TestApp> {
-  const emails = new MemoryEmailSender();
+  const emails = options.emails ?? new MemoryEmailSender();
+  const env = options.env ?? testApiEnv();
   const moduleRef = await Test.createTestingModule({
-    imports: [AppModule.register({ env: options.env ?? testApiEnv(), emailSender: emails })],
+    imports: [AppModule.register({ env, emailSender: emails })],
     controllers: options.controllers ?? [],
   }).compile();
 
@@ -31,5 +33,5 @@ export async function createTestApp(
   });
   configureApp(app, { docs: options.docs ?? false });
   await app.listen(0);
-  return { app, server: app.getHttpServer(), emails };
+  return { app, server: app.getHttpServer(), emails, env };
 }

@@ -8,7 +8,7 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 
 ## Phase 1 – Foundation
 
-**Goal:** a secure multi-tenant skeleton with role-based access and a well-defined API, running locally.
+**Goal:** complete, tested authentication and role-based access on a secure multi-tenant skeleton, usable in the browser and running locally.
 
 - [x] **1.1 Monorepo.** Turborepo + pnpm with `apps/web`, `apps/api`, `apps/worker`, `packages/db`, `packages/shared`, `packages/ai`, `packages/evals`. Shared tsconfig (strict), ESLint/Prettier or Biome, Vitest config.
 - [x] **1.2 Local infrastructure.** Docker Compose: Postgres with pgvector, Redis, MinIO, Langfuse. `.env.example` and env validation with Zod in each app.
@@ -16,11 +16,14 @@ Each step is sized for one Claude Code session. Tick steps as they are done.
 - [x] **1.4 Tenant context.** NestJS middleware/interceptor that opens a transaction and sets `app.tenant_id` per request; helper for workers to do the same per job. Integration test: tenant A cannot read tenant B rows even with a raw query that omits `WHERE tenant_id`.
 - [x] **1.5 Auth.** Better Auth with the organizations plugin; sign up, sign in, create workspace, invite by email, accept invite. Session shared between web and API.
 - [x] **1.6 Roles.** `@Roles()` decorator + guard for owner/admin/editor/viewer. Tests for each role boundary.
-- [ ] **1.7 API design.** Conventions every endpoint follows: request validation (body, query, params) with Zod schemas from `packages/shared`, with OpenAPI generated from the same schemas; one error shape (`statusCode`, `code`, `message`, optional `details`) from the domain exception filter; cursor pagination; workspace-scoped resource routes under `/api`; request IDs in responses and logs; Better Auth endpoints included in the API docs. First resources built on these conventions and the 1.6 roles: members (list, change role, remove), invitations (list, cancel) and groups (CRUD, add/remove members), with integration tests for every endpoint and role.
-- [ ] **1.8 Web shell.** Next.js app with auth pages, onboarding (create workspace), app layout with sidebar and workspace switcher, empty pages for Ask, Search, Documents, Settings, Evals.
-- [ ] **1.9 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests (Postgres and Redis as services).
+- [x] **1.7 Sessions on Redis.** Better Auth `secondaryStorage` on Redis with a copy of each session in Postgres; rate limits in Redis (shared by all instances) with stricter rules for sign-in, sign-up and password reset; `cookieCache` off so revocation is immediate. Readiness endpoint checking Postgres and Redis. Tests: a session created on one API instance works on another, sign-out on one is enforced on the other, rate limits count across instances, an unreachable Redis fails closed.
+- [ ] **1.8 API contracts and web foundation.** One Zod contract per endpoint in `packages/shared` (method, path, params, query, body, response) used by Nest (route, validation, Swagger) and by the web's typed client. Error shape `{ statusCode, code, message, details?, requestId }`, request IDs, cursor pagination, Better Auth endpoints in the API docs. Web: shadcn/ui, TanStack Query, `src/lib/api` typed client (server + browser variants through the same-origin proxy), `src/features/<domain>` structure, app shell with workspace switcher and account menu. Role-aware UI, mock pages for Ask, Search, Documents and Evals, and an Access page whose actions call dev-only mock endpoints protected by real `@Roles`. Dev seed with owner, admin, editor and viewer users.
+- [ ] **1.9 Account lifecycle and social sign-in.** Forgot/reset password, change password, change email (verified), resend verification, edit profile, list and revoke sessions, delete account (confirmed by email, blocked while sole owner of a workspace); Google and GitHub sign-in with safe account linking. Pages for each flow; tests for each flow and its abuse cases.
+- [ ] **1.10 Workspace administration.** Members (list, change role, remove, leave), invitations (list, resend, cancel, reject, invitations for me), workspace settings (rename, delete by owner), last-owner protection and ownership transfer; groups as a Nest resource on the 1.8 contracts. Pages under workspace settings; tests for every endpoint and role.
+- [ ] **1.11 End-to-end tests.** Playwright with an email outbox (dev/test only): sign-up to accept invite, password reset, change email, session revocation, and what each seeded role can see and do.
+- [ ] **1.12 CI.** GitHub Actions: install, lint, typecheck, unit + integration tests (Postgres and Redis as services), end-to-end tests.
 
-**Gate:** locally, a user can sign up, create a workspace, invite a teammate and manage members and groups according to their role; isolation and role tests pass in CI.
+**Gate:** locally, every account flow works and each of the four seeded roles can be signed into to see what it can and cannot do; isolation, role and end-to-end tests pass in CI.
 
 ---
 

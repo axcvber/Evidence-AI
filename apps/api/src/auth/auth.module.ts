@@ -8,7 +8,9 @@ import {
   OnApplicationShutdown,
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { Redis } from 'ioredis';
 import { EMAIL_SENDER, EmailSender } from '../email/email-sender.js';
+import { REDIS } from '../redis/redis.module.js';
 import { AuthOptions, createAuth } from './auth.js';
 import { AuthGuard } from './auth.guard.js';
 import { AUTH } from './auth.tokens.js';
@@ -20,7 +22,7 @@ const AUTH_DATABASE_POOL = Symbol('AUTH_DATABASE_POOL');
 
 type Pool = ReturnType<typeof createDb>['pool'];
 
-export interface AuthModuleOptions extends Omit<AuthOptions, 'db' | 'emailSender'> {
+export interface AuthModuleOptions extends Omit<AuthOptions, 'db' | 'emailSender' | 'redis'> {
   /** Must connect as evidence_auth, never the app or owner role. */
   databaseUrl: string;
 }
@@ -48,8 +50,9 @@ export class AuthModule {
         AuthDatabaseShutdown,
         {
           provide: AUTH,
-          inject: [EMAIL_SENDER],
-          useFactory: (emailSender: EmailSender) => createAuth({ ...authOptions, db, emailSender }),
+          inject: [EMAIL_SENDER, REDIS],
+          useFactory: (emailSender: EmailSender, redis: Redis) =>
+            createAuth({ ...authOptions, db, emailSender, redis }),
         },
         // Global guards run in registration order: authenticate first, then check the role.
         { provide: APP_GUARD, useClass: AuthGuard },

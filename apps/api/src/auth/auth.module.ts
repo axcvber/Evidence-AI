@@ -13,7 +13,8 @@ import { EMAIL_SENDER, EmailSender } from '../email/email-sender.js';
 import { REDIS } from '../redis/redis.module.js';
 import { AuthOptions, createAuth } from './auth.js';
 import { AuthGuard } from './auth.guard.js';
-import { AUTH } from './auth.tokens.js';
+import { AuthProvidersController } from './auth-providers.controller.js';
+import { AUTH, SOCIAL_PROVIDERS } from './auth.tokens.js';
 import { RolesGuard } from './roles.guard.js';
 
 export { AUTH };
@@ -45,7 +46,12 @@ export class AuthModule {
 
     return {
       module: AuthModule,
+      controllers: [AuthProvidersController],
       providers: [
+        {
+          provide: SOCIAL_PROVIDERS,
+          useValue: Object.keys(authOptions.socialProviders),
+        },
         { provide: AUTH_DATABASE_POOL, useValue: pool },
         AuthDatabaseShutdown,
         {

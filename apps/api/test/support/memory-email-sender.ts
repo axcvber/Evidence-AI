@@ -9,6 +9,11 @@ export class MemoryEmailSender implements EmailSender {
     return Promise.resolve();
   }
 
+  /** Every email sent to `to`, oldest first. */
+  to(address: string): EmailMessage[] {
+    return this.sent.filter((m) => m.to === address);
+  }
+
   /** The first link in the latest email to `to`, as a path relative to the web origin. */
   lastLinkTo(to: string): string {
     const message = this.sent.findLast((m) => m.to === to);

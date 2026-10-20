@@ -50,6 +50,17 @@ export async function signUpVerified(
   return agent;
 }
 
+/** A fresh browser signed in with email and password. */
+export async function signIn(
+  server: Server,
+  email: string,
+  password = TEST_PASSWORD,
+): Promise<Agent> {
+  const agent = browser(server);
+  await agent.post('/api/auth/sign-in/email').send({ email, password }).expect(200);
+  return agent;
+}
+
 export async function createWorkspace(agent: Agent, name: string, slug: string): Promise<string> {
   const res = await agent.post('/api/auth/organization/create').send({ name, slug }).expect(200);
   return (res.body as { id: string }).id;

@@ -1,4 +1,4 @@
-import { parseEnv, serverEnvSchema } from '@evidence/shared';
+import { parseEnv, serverEnvSchema, SocialProviderId } from '@evidence/shared';
 import { z } from 'zod';
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
@@ -44,8 +44,25 @@ export const apiEnvSchema = serverEnvSchema
 
     RESEND_API_KEY: z.string().startsWith('re_').optional(),
     EMAIL_FROM: emailSender,
+
+    // Social sign-in. Each provider is on only when both its client ID and secret are set.
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    GITHUB_CLIENT_ID: z.string().min(1).optional(),
+    GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
+    for (const provider of ['GOOGLE', 'GITHUB'] as const) {
+      const id = env[`${provider}_CLIENT_ID`];
+      const secret = env[`${provider}_CLIENT_SECRET`];
+      if (Boolean(id) !== Boolean(secret)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [id ? `${provider}_CLIENT_SECRET` : `${provider}_CLIENT_ID`],
+          message: `Set both ${provider}_CLIENT_ID and ${provider}_CLIENT_SECRET, or neither`,
+        });
+      }
+    }
     // Without a key, emails are only logged; that must never happen in production.
     if (env.NODE_ENV === 'production' && !env.RESEND_API_KEY) {
       ctx.addIssue({
@@ -91,6 +108,22 @@ export function authRateLimitEnabled(
   env: Pick<ApiEnv, 'NODE_ENV' | 'AUTH_RATE_LIMIT_ENABLED'>,
 ): boolean {
   return env.AUTH_RATE_LIMIT_ENABLED ?? env.NODE_ENV !== 'test';
+}
+
+export type SocialProviderCredentials = Partial<
+  Record<SocialProviderId, { clientId: string; clientSecret: string }>
+>;
+
+/** OAuth credentials for each social provider that is fully configured. */
+export function socialProviderCredentials(env: ApiEnv): SocialProviderCredentials {
+  const credentials: SocialProviderCredentials = {};
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    credentials.google = { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET };
+  }
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    credentials.github = { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET };
+  }
+  return credentials;
 }
 
 export function devMocksEnabled(env: Pick<ApiEnv, 'NODE_ENV' | 'DEV_MOCKS_ENABLED'>): boolean {

@@ -7,6 +7,7 @@ import {
   FlaskConical,
   MessageSquare,
   Search,
+  Settings,
   ShieldCheck,
   Users,
   type LucideIcon,
@@ -51,6 +52,7 @@ const sections: { label: string; items: NavItem[] }[] = [
   {
     label: 'Settings',
     items: [
+      { label: 'Workspace', href: 'settings/workspace', icon: Settings },
       { label: 'Members', href: 'settings/members', icon: Users },
       { label: 'Access', href: 'settings/access', icon: ShieldCheck },
     ],

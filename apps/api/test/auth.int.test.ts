@@ -109,6 +109,19 @@ describe('sign-up and sign-in', () => {
     await request(t.server).get('/api/me').expect(401);
   });
 
+  it('refuses a signed-in request from another origin (CSRF)', async () => {
+    const email = uniqueEmail('csrf');
+    const victim = await signUpVerified(t.server, t.emails, email);
+    const res = await victim
+      .post('/api/auth/update-user')
+      .set('Origin', 'https://evil.example')
+      .send({ name: 'Pwned' });
+    expect(res.status).toBe(403);
+    expect((await victim.get('/api/me').expect(200)).body).toMatchObject({
+      user: { name: 'Test User' },
+    });
+  });
+
   it('rejects a forged session cookie', async () => {
     await request(t.server)
       .get('/api/me')
@@ -122,6 +135,21 @@ describe('workspaces', () => {
     const { agent, tenantId } = await ownerWithWorkspace();
     const me = await agent.get('/api/me').expect(200);
     expect((me.body as MeResponse).activeWorkspace).toMatchObject({ id: tenantId, role: 'owner' });
+  });
+
+  it('reports the active workspace, not just any workspace the user belongs to', async () => {
+    const agent = await signUpVerified(t.server, t.emails, uniqueEmail('multi'));
+    const first = await createWorkspace(agent, 'First', uniqueSlug('first'));
+    const second = await createWorkspace(agent, 'Second', uniqueSlug('second'));
+
+    for (const id of [first, second, first]) {
+      await agent
+        .post('/api/auth/organization/set-active')
+        .send({ organizationId: id })
+        .expect(200);
+      const me = (await agent.get('/api/me').expect(200)).body as MeResponse;
+      expect(me.activeWorkspace?.id).toBe(id);
+    }
   });
 
   it('rejects an invalid slug with a 400', async () => {

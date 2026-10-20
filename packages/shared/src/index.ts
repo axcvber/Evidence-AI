@@ -1,3 +1,4 @@
+export * from './account.js';
 export * from './capabilities.js';
 export * from './contracts/index.js';
 export * from './env.js';

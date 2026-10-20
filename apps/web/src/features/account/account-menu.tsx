@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronsUpDown, LogOut } from 'lucide-react';
+import { ChevronsUpDown, LogOut, MonitorSmartphone, ShieldCheck, UserRound } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -55,6 +56,22 @@ export function AccountMenu() {
               <div className="font-medium">{user.name}</div>
               <div className="text-xs text-muted-foreground">{user.email}</div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/account/profile">
+                <UserRound /> Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/account/security">
+                <ShieldCheck /> Security
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/account/sessions">
+                <MonitorSmartphone /> Sessions
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => void signOut()}>
               <LogOut /> Sign out

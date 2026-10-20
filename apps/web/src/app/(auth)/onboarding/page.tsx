@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AuthCard } from '@/features/auth/auth-card';
 import { CreateWorkspaceForm } from '@/features/auth/create-workspace-form';
+import { YourWorkspaces } from '@/features/workspace/your-workspaces';
 import { getCurrentUser } from '@/lib/session';
 
 export const metadata = { title: 'Create a workspace' };
@@ -20,6 +21,7 @@ export default async function OnboardingPage() {
         )
       }
     >
+      <YourWorkspaces />
       <CreateWorkspaceForm />
     </AuthCard>
   );

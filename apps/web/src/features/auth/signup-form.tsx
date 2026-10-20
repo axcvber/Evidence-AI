@@ -1,5 +1,6 @@
 'use client';
 
+import { MIN_PASSWORD_LENGTH, type SocialProviderId } from '@evidence/shared';
 import Link from 'next/link';
 import { useState, type SubmitEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,15 @@ import { Label } from '@/components/ui/label';
 import { authClient } from '@/lib/auth-client';
 import { formText } from '@/lib/form-data';
 import { AuthCard, FormError } from './auth-card';
+import { SocialSignIn } from './social-sign-in';
 
-export function SignupForm({ next }: { next: string }) {
+export function SignupForm({
+  next,
+  providers,
+}: {
+  next: string;
+  providers: readonly SocialProviderId[];
+}) {
   const [error, setError] = useState('');
   const [sentTo, setSentTo] = useState('');
   const [pending, setPending] = useState(false);
@@ -24,8 +32,9 @@ export function SignupForm({ next }: { next: string }) {
       name: formText(form, 'name'),
       email,
       password: formText(form, 'password'),
-      // Where the verification link lands after the email is confirmed.
-      callbackURL: next === '/' ? '/onboarding' : next,
+      // Where the verification link lands; that page continues to `next` or explains an
+      // expired link.
+      callbackURL: `/verify-email?next=${encodeURIComponent(next)}`,
     });
     setPending(false);
     if (error) setError(error.message ?? 'Could not sign up');
@@ -45,6 +54,15 @@ export function SignupForm({ next }: { next: string }) {
         <p className="text-sm text-muted-foreground">
           Running locally without a Resend key? The link is printed in the API log.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Nothing arrived?{' '}
+          <Link
+            className="underline"
+            href={`/verify-email?email=${encodeURIComponent(sentTo)}&next=${encodeURIComponent(next)}`}
+          >
+            Send a new link
+          </Link>
+        </p>
       </AuthCard>
     );
   }
@@ -59,6 +77,11 @@ export function SignupForm({ next }: { next: string }) {
         </>
       }
     >
+      <SocialSignIn
+        providers={providers}
+        next={next}
+        errorPath={`/login?next=${encodeURIComponent(next)}`}
+      />
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
@@ -74,11 +97,13 @@ export function SignupForm({ next }: { next: string }) {
             id="password"
             name="password"
             type="password"
-            minLength={12}
+            minLength={MIN_PASSWORD_LENGTH}
             required
             autoComplete="new-password"
           />
-          <p className="text-xs text-muted-foreground">At least 12 characters.</p>
+          <p className="text-xs text-muted-foreground">
+            At least {MIN_PASSWORD_LENGTH} characters.
+          </p>
         </div>
         <FormError>{error}</FormError>
         <Button type="submit" className="w-full" disabled={pending}>

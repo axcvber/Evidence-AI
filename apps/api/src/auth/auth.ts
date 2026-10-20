@@ -11,14 +11,30 @@ import {
 import { redisStorage } from '@better-auth/redis-storage';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx, isAPIError } from 'better-auth/api';
 import { openAPI, organization } from 'better-auth/plugins';
-import { workspaceRoleNames } from '@evidence/shared';
+import { MIN_PASSWORD_LENGTH, workspaceRoleNames } from '@evidence/shared';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { EmailSender } from '../email/email-sender.js';
+import type { SocialProviderCredentials } from '../env.js';
 import { accessControl, workspaceRoles } from './access-control.js';
-import { invitationEmail, verificationEmail } from './emails.js';
+import { defaultActiveWorkspace } from './active-workspace.js';
+import { assertWorkspaceDeletionConfirmed } from './workspace-rules.js';
+import {
+  assertNotSoleOwner,
+  normalizeProfileInput,
+  rejectUnverifiedSocialSignUp,
+} from './account-rules.js';
+import {
+  changeEmailApprovalEmail,
+  deleteAccountEmail,
+  existingAccountEmail,
+  invitationEmail,
+  passwordChangedEmail,
+  resetPasswordEmail,
+  verificationEmail,
+} from './emails.js';
 
 export interface AuthOptions {
   /** Drizzle client connected as evidence_auth. */
@@ -35,10 +51,14 @@ export interface AuthOptions {
   /** Serve Better Auth's own API reference at /api/auth/reference (same switch as /api/docs). */
   openApiReference: boolean;
   clientIp: { header: string; trustedProxies?: string[] | undefined };
+  /** Google/GitHub OAuth apps; a provider is enabled only when it is listed here. */
+  socialProviders: SocialProviderCredentials;
 }
 
 export const AUTH_BASE_PATH = '/api/auth';
 const INVITATION_TTL_SECONDS = 7 * 24 * 60 * 60;
+const RESET_PASSWORD_TTL_SECONDS = 60 * 60;
+const DELETE_ACCOUNT_TTL_SECONDS = 60 * 60;
 
 // Same rules as the tenants table checks, reported as a 400 instead of a database error.
 const workspaceInput = z.object({
@@ -60,7 +80,7 @@ function assertWorkspaceRole(role: string): void {
 }
 
 export function createAuth(options: AuthOptions) {
-  const { emailSender, baseUrl } = options;
+  const { emailSender, baseUrl, db } = options;
 
   return betterAuth({
     appName: 'Evidence AI',
@@ -89,20 +109,61 @@ export function createAuth(options: AuthOptions) {
         '/sign-in/email': { window: 60, max: 10 },
         '/sign-up/email': { window: 60, max: 5 },
         '/send-verification-email': { window: 60, max: 3 },
+        '/request-password-reset': { window: 60, max: 3 },
+        '/reset-password': { window: 60, max: 10 },
+        '/change-password': { window: 60, max: 5 },
+        '/change-email': { window: 60, max: 3 },
+        '/delete-user': { window: 60, max: 3 },
       },
     },
+    // Reset, delete-account and OAuth-state tokens live in Redis; only their hashes are stored,
+    // so a Redis dump cannot be used to reset someone's password.
+    verification: { modelName: 'verifications', storeIdentifier: 'hashed' },
 
     database: drizzleAdapter(options.db, {
       provider: 'pg',
       schema: { users, sessions, accounts, verifications, tenants, memberships, invitations },
     }),
-    user: { modelName: 'users' },
-    account: { modelName: 'accounts' },
-    verification: { modelName: 'verifications' },
+    user: {
+      modelName: 'users',
+      // Two steps: the current address approves, then the new address confirms. Only then is
+      // the email changed, so a stolen session alone cannot move the account to a new address.
+      changeEmail: {
+        enabled: true,
+        sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+          await emailSender.send(
+            changeEmailApprovalEmail({ to: user.email, name: user.name, newEmail, url }),
+          );
+        },
+      },
+      // Deletion always needs the link emailed to the account's address, opened while signed in.
+      deleteUser: {
+        enabled: true,
+        deleteTokenExpiresIn: DELETE_ACCOUNT_TTL_SECONDS,
+        sendDeleteAccountVerification: async ({ user, token }) => {
+          const url = `${baseUrl}/account/delete?token=${encodeURIComponent(token)}`;
+          await emailSender.send(deleteAccountEmail(user.email, user.name, url));
+        },
+        beforeDelete: async (user) => {
+          await assertNotSoleOwner(db, user.id);
+        },
+      },
+      validateUserInfo: ({ user, source }) => rejectUnverifiedSocialSignUp(user, source),
+    },
+    account: {
+      modelName: 'accounts',
+      // Defaults kept on purpose: an OAuth identity links to an existing account only when the
+      // provider verified the email and the local account is verified too (no trusted
+      // providers), the emails must match, and the last sign-in method cannot be unlinked.
+      accountLinking: { enabled: true },
+    },
     advanced: {
       database: { generateId: 'uuid' },
       cookiePrefix: 'evidence',
       useSecureCookies: options.secureCookies,
+      // Better Auth skips origin and CSRF checks when it detects a test run; keep them on so
+      // the integration tests exercise the same checks as production.
+      disableOriginCheck: false,
       ipAddress: {
         ipAddressHeaders: [options.clientIp.header],
         ...(options.clientIp.trustedProxies && { trustedProxies: options.clientIp.trustedProxies }),
@@ -112,15 +173,80 @@ export function createAuth(options: AuthOptions) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
-      minPasswordLength: 12,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
       maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: RESET_PASSWORD_TTL_SECONDS,
+      // A reset signs out every device, in case the old password was known to someone else.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        await emailSender.send(resetPasswordEmail(user.email, user.name, url));
+      },
+      onPasswordReset: async ({ user }) => {
+        await emailSender.send(passwordChangedEmail(user.email, user.name));
+      },
+      // Sign-up answers the same for new and existing emails (no account enumeration); the
+      // owner of an existing account is told instead.
+      onExistingUserSignUp: async ({ user }) => {
+        await emailSender.send(existingAccountEmail(user.email, user.name, `${baseUrl}/login`));
+      },
     },
+    socialProviders: options.socialProviders,
     emailVerification: {
       sendOnSignUp: true,
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
         await emailSender.send(verificationEmail(user.email, user.name, url));
       },
+    },
+
+    databaseHooks: {
+      session: {
+        create: {
+          // New sessions start in one of the user's workspaces instead of none (see
+          // defaultActiveWorkspace). AuthGuard still re-checks the membership on every request.
+          before: async (session, ctx) => {
+            const current = ctx?.context.session?.session as
+              { userId: string; activeOrganizationId?: string | null } | undefined;
+            const existing = (session as { activeOrganizationId?: string | null })
+              .activeOrganizationId;
+            if (existing) return undefined;
+            const preferred =
+              current?.userId === session.userId ? current.activeOrganizationId : null;
+            const activeOrganizationId = await defaultActiveWorkspace(
+              db,
+              session.userId,
+              preferred,
+            );
+            return activeOrganizationId
+              ? { data: { ...session, activeOrganizationId } }
+              : undefined;
+          },
+        },
+      },
+    },
+
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-up/email' || ctx.path === '/update-user') {
+          return { context: { body: normalizeProfileInput(ctx.body as object) } };
+        }
+        if (ctx.path === '/organization/delete') {
+          await assertWorkspaceDeletionConfirmed(db, ctx.body);
+        }
+        // Refuse a deletion request up front (errors inside the email callback are only
+        // logged); beforeDelete checks again when the emailed link is confirmed.
+        if (ctx.path === '/delete-user' && !(ctx.body as { token?: string } | undefined)?.token) {
+          const session = await getSessionFromCtx(ctx);
+          if (session) await assertNotSoleOwner(db, session.user.id);
+        }
+        return undefined;
+      }),
+      after: createAuthMiddleware(async (ctx) => {
+        const returned = ctx.context.returned;
+        if (ctx.path !== '/change-password' || !returned || isAPIError(returned)) return;
+        const { user } = returned as { user: { email: string; name: string } };
+        await emailSender.send(passwordChangedEmail(user.email, user.name));
+      }),
     },
 
     plugins: [

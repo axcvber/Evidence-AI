@@ -1,5 +1,5 @@
 import { createDb, memberships, tenants, users } from '@evidence/db';
-import type { WorkspaceRole } from '@evidence/shared';
+import { MIN_PASSWORD_LENGTH, type WorkspaceRole } from '@evidence/shared';
 import { and, eq } from 'drizzle-orm';
 import { createAuth } from '../auth/auth.js';
 import { loadApiEnv } from '../env.js';
@@ -47,7 +47,8 @@ const workspaces: {
 async function main(): Promise<void> {
   const env = loadApiEnv();
   if (env.NODE_ENV === 'production') throw new Error('The dev seed never runs in production');
-  if (PASSWORD.length < 12) throw new Error('DEV_SEED_PASSWORD must be at least 12 characters');
+  if (PASSWORD.length < MIN_PASSWORD_LENGTH)
+    throw new Error(`DEV_SEED_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters`);
 
   const { db, pool } = createDb(env.AUTH_DATABASE_URL, { max: 2 });
   const redis = createRedisClient(env.REDIS_URL);
@@ -62,6 +63,7 @@ async function main(): Promise<void> {
     rateLimit: false,
     openApiReference: false,
     clientIp: { header: 'x-forwarded-for' },
+    socialProviders: {},
   });
 
   try {

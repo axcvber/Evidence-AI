@@ -1,6 +1,7 @@
 import { tenants } from '@evidence/db';
 import type { MeResponse } from '@evidence/shared';
 import { getMe } from '@evidence/shared';
+import { eq } from 'drizzle-orm';
 import { Controller, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../auth/authenticated-request.js';
@@ -24,10 +25,12 @@ export class MeController {
     if (!request.tenantContext || !request.membershipRole)
       return { ...base, activeWorkspace: null };
 
-    // No WHERE needed: RLS limits `tenants` to the active workspace.
+    // RLS also lets members read their other workspaces (for the switcher), so filter by the
+    // active one explicitly.
     const [tenant] = await this.tenantDb.tx
       .select({ id: tenants.id, name: tenants.name, slug: tenants.slug })
-      .from(tenants);
+      .from(tenants)
+      .where(eq(tenants.id, request.tenantContext.tenantId));
     return {
       ...base,
       activeWorkspace: tenant ? { ...tenant, role: request.membershipRole } : null,

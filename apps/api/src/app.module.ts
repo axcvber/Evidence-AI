@@ -5,7 +5,13 @@ import { DatabaseModule } from './database/database.module.js';
 import { EmailSender } from './email/email-sender.js';
 import { EmailModule } from './email/email.module.js';
 import { DevMocksModule } from './dev-mocks/dev-mocks.module.js';
-import { ApiEnv, apiDocsEnabled, authRateLimitEnabled, devMocksEnabled } from './env.js';
+import {
+  ApiEnv,
+  apiDocsEnabled,
+  authRateLimitEnabled,
+  devMocksEnabled,
+  socialProviderCredentials,
+} from './env.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -42,6 +48,7 @@ export class AppModule {
             header: env.CLIENT_IP_HEADER ?? 'x-forwarded-for',
             trustedProxies: env.TRUSTED_PROXIES,
           },
+          socialProviders: socialProviderCredentials(env),
         }),
         ContractsModule,
         TenancyModule,

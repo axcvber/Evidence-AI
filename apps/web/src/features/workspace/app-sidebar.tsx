@@ -10,6 +10,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -54,6 +55,7 @@ const sections: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'Workspace', href: 'settings/workspace', icon: Settings },
       { label: 'Members', href: 'settings/members', icon: Users },
+      { label: 'Groups', href: 'settings/groups', icon: UsersRound },
       { label: 'Access', href: 'settings/access', icon: ShieldCheck },
     ],
   },

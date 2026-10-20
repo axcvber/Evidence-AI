@@ -85,6 +85,7 @@ The API never queries without a tenant context, and Postgres Row-Level Security 
 - **Tenant isolation:** every table has `tenant_id`. The API sets the tenant on the database session, and RLS policies reject any row from another tenant.
 - **Roles:** Owner, Admin, Editor, Viewer at the workspace level (who can upload, manage users, run evals).
 - **Database roles:** the API and workers connect as an application role that cannot bypass RLS. Better Auth uses a separate role whose policies and grants cover only the auth tables (users, sessions, accounts, workspaces, memberships, invitations), never documents or chunks. Migrations run as the schema owner.
+- **Every workspace has an owner:** a deferred constraint trigger on memberships refuses any commit that would leave an existing workspace without an owner. It locks the workspace row first, so two owners demoting each other at the same time can't both succeed. The API checks the same rule first to give a clear error; the trigger is the guarantee.
 - **Document ACL:** each document is visible to everyone in the workspace, or to selected groups and users. The allowed group and user IDs are copied onto each chunk and indexed.
 - **Pre-filter, never post-filter:** permissions are applied inside the retrieval SQL. Filtering after retrieval can leak text through the LLM and also leaves too few results.
 - **ACL changes:** editing a document's sharing enqueues a job that updates its chunks; until it finishes, the document is hidden from search (fail closed).
@@ -138,8 +139,9 @@ The app has 16 screens in five areas. A public demo workspace with sample docume
 | Workspace | Search | /w/\[ws\]/search | Hybrid search results with snippets and filters | All roles |
 | Workspace | Documents | /w/\[ws\]/documents | Collections, upload, status, sharing badge | All roles (upload: Editor+) |
 | Workspace | Document detail | /w/\[ws\]/documents/\[id\] | Preview, versions, chunks, who can access, re-index | Editor+ |
-| Admin | Members and groups | /w/\[ws\]/settings/members, /w/\[ws\]/settings/groups | Members, roles, invitations, groups | Admin+ (members list: all roles) |
-| Admin | Workspace settings | /w/\[ws\]/settings/workspace | Rename, transfer ownership, delete workspace | Admin+ (delete: Owner) |
+| Admin | Members and groups | /w/\[ws\]/settings/members, /w/\[ws\]/settings/groups | Members, roles, invitations, groups | View: all roles (pending invitations: Admin+); changes: Admin+ (owners only by owners) |
+| Admin | Workspace settings | /w/\[ws\]/settings/workspace | Rename, leave, delete workspace | Leave: all roles; rename: Admin+; delete: Owner |
+| Account | Invitations | /invitations | Accept or decline invitations sent to your email | Signed-in users |
 | Admin | Access review | /w/\[ws\]/settings/access | Which groups can see which documents; "view as user" check | Admin+ |
 | Admin | Usage and costs | /w/\[ws\]/settings/usage | Questions, tokens, cost, p95 latency, top unanswered questions | Admin+ |
 | Quality | Evals | /w/\[ws\]/evals | Datasets, runs, metric trends, run comparison | Admin+ |

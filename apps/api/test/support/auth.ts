@@ -82,3 +82,32 @@ export async function expectNoWorkspaceAccess(get: Getter): Promise<void> {
     throw new Error(`Expected NO_ACTIVE_WORKSPACE, got ${JSON.stringify(res.body)}`);
   }
 }
+
+export interface JoinedMember {
+  agent: Agent;
+  email: string;
+  userId: string;
+}
+
+/** Invites a new user with `role`, signs them up and accepts; their active workspace is it. */
+export async function inviteAndJoin(
+  server: Server,
+  emails: MemoryEmailSender,
+  inviter: Agent,
+  role: string,
+): Promise<JoinedMember> {
+  const email = uniqueEmail(role);
+  await inviter.post('/api/auth/organization/invite-member').send({ email, role }).expect(200);
+  const invitationId = emails.lastLinkTo(email).split('/').at(-1);
+  const agent = await signUpVerified(server, emails, email, `${role} member`);
+  const accepted = await agent
+    .post('/api/auth/organization/accept-invitation')
+    .send({ invitationId })
+    .expect(200);
+  const { member } = accepted.body as { member: { organizationId: string; userId: string } };
+  await agent
+    .post('/api/auth/organization/set-active')
+    .send({ organizationId: member.organizationId })
+    .expect(200);
+  return { agent, email, userId: member.userId };
+}

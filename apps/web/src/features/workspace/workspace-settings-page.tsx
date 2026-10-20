@@ -1,8 +1,10 @@
 'use client';
 
 import { PageHeader } from '@/components/page-header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DeleteWorkspaceCard } from './delete-workspace-card';
+import { LeaveWorkspaceButton } from './leave-workspace-button';
+import { RenameWorkspaceForm } from './rename-workspace-form';
 import { Can, useWorkspace } from './workspace-context';
 
 export function WorkspaceSettingsPage() {
@@ -13,22 +15,27 @@ export function WorkspaceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
+          <CardDescription>
+            The URL name <span className="font-mono">{workspace.slug}</span> stays the same so links
+            keep working. Your role: <span className="capitalize">{workspace.role}</span>.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-[120px_1fr]">
-          <span className="text-muted-foreground">Name</span>
-          <span>{workspace.name}</span>
-          <span className="text-muted-foreground">URL name</span>
-          <span className="font-mono">{workspace.slug}</span>
-          <span className="text-muted-foreground">Your role</span>
-          <span className="capitalize">{workspace.role}</span>
+        <CardContent>
+          <Can capability="workspace.rename" fallback={<p className="text-sm">{workspace.name}</p>}>
+            <RenameWorkspaceForm />
+          </Can>
         </CardContent>
       </Card>
-      <Can
-        capability="workspace.delete"
-        fallback={
-          <p className="text-sm text-muted-foreground">Only owners can delete this workspace.</p>
-        }
-      >
+      <Card>
+        <CardHeader>
+          <CardTitle>Leave workspace</CardTitle>
+          <CardDescription>Owners can leave only while another owner remains.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LeaveWorkspaceButton />
+        </CardContent>
+      </Card>
+      <Can capability="workspace.delete">
         <DeleteWorkspaceCard />
       </Can>
     </>

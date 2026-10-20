@@ -12,6 +12,7 @@ import {
   devMocksEnabled,
   socialProviderCredentials,
 } from './env.js';
+import { GroupsModule } from './groups/groups.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -54,6 +55,7 @@ export class AppModule {
         TenancyModule,
         HealthModule,
         MeModule,
+        GroupsModule,
         ...(devMocksEnabled(env) ? [DevMocksModule] : []),
       ],
     };

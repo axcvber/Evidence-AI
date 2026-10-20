@@ -20,8 +20,11 @@ import { useWorkspace } from '@/features/workspace/workspace-context';
 import { isApiError } from '@/lib/api/api-error';
 import { callEndpoint } from '@/lib/api/call-endpoint';
 
-/** A valid sample request per capability, sent to its dev-mock endpoint by "Try it". */
-const samples: Record<Capability, { mock: DevMockName; input: object }> = {
+/**
+ * A valid sample request per capability, sent to its dev-mock endpoint by "Try it". Capabilities
+ * that are real features already (member management, renaming) are tried on their own pages.
+ */
+const samples: Partial<Record<Capability, { mock: DevMockName; input: object }>> = {
   'documents.read': { mock: 'listDocuments', input: { query: {} } },
   ask: { mock: 'ask', input: { body: { question: 'What is our leave policy?' } } },
   search: { mock: 'search', input: { query: { q: 'leave' } } },
@@ -40,8 +43,13 @@ const samples: Record<Capability, { mock: DevMockName; input: object }> = {
 type Outcome = { status: 'allowed' } | { status: 'refused'; code: string } | { status: 'error' };
 
 function TryIt({ capability }: { capability: Capability }) {
-  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const sample = samples[capability];
+  if (!sample) return <span className="text-xs text-muted-foreground">On its own page</span>;
+  return <TryItButton sample={sample} />;
+}
+
+function TryItButton({ sample }: { sample: { mock: DevMockName; input: object } }) {
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
 
   async function run() {
     try {

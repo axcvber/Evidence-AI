@@ -20,7 +20,12 @@ import { EmailSender } from '../email/email-sender.js';
 import type { SocialProviderCredentials } from '../env.js';
 import { accessControl, workspaceRoles } from './access-control.js';
 import { defaultActiveWorkspace } from './active-workspace.js';
-import { assertWorkspaceDeletionConfirmed } from './workspace-rules.js';
+import {
+  assertCanCancelInvitation,
+  assertWorkspaceDeletionConfirmed,
+  canSeeInvitations,
+  normalizeWorkspaceUpdate,
+} from './workspace-rules.js';
 import {
   assertNotSoleOwner,
   normalizeProfileInput,
@@ -122,6 +127,9 @@ export function createAuth(options: AuthOptions) {
 
     database: drizzleAdapter(options.db, {
       provider: 'pg',
+      // Multi-step operations (e.g. deleting a workspace: members, invitations, then the
+      // workspace) commit or fail as one. The owner guard in migration 0004 relies on it.
+      transaction: true,
       schema: { users, sessions, accounts, verifications, tenants, memberships, invitations },
     }),
     user: {
@@ -233,6 +241,21 @@ export function createAuth(options: AuthOptions) {
         if (ctx.path === '/organization/delete') {
           await assertWorkspaceDeletionConfirmed(db, ctx.body);
         }
+        if (ctx.path === '/organization/update') {
+          return { context: { body: normalizeWorkspaceUpdate(ctx.body as object) } };
+        }
+        if (ctx.path === '/organization/list-invitations') {
+          const session = await getSessionFromCtx(ctx);
+          const query = ctx.query as { organizationId?: string } | undefined;
+          const active = session?.session as { activeOrganizationId?: string | null } | undefined;
+          const tenantId = query?.organizationId ?? active?.activeOrganizationId;
+          if (session && tenantId && !(await canSeeInvitations(db, tenantId, session.user.id))) {
+            throw new APIError('FORBIDDEN', {
+              code: 'INSUFFICIENT_ROLE',
+              message: 'Only admins and owners can see pending invitations.',
+            });
+          }
+        }
         // Refuse a deletion request up front (errors inside the email callback are only
         // logged); beforeDelete checks again when the emailed link is confirmed.
         if (ctx.path === '/delete-user' && !(ctx.body as { token?: string } | undefined)?.token) {
@@ -243,9 +266,19 @@ export function createAuth(options: AuthOptions) {
       }),
       after: createAuthMiddleware(async (ctx) => {
         const returned = ctx.context.returned;
-        if (ctx.path !== '/change-password' || !returned || isAPIError(returned)) return;
-        const { user } = returned as { user: { email: string; name: string } };
-        await emailSender.send(passwordChangedEmail(user.email, user.name));
+        if (!returned || isAPIError(returned)) return undefined;
+        if (ctx.path === '/change-password') {
+          const { user } = returned as { user: { email: string; name: string } };
+          await emailSender.send(passwordChangedEmail(user.email, user.name));
+        }
+        // The full workspace includes pending invitations; strip them for editors and viewers.
+        if (ctx.path === '/organization/get-full-organization') {
+          const workspace = returned as { id: string };
+          const session = await getSessionFromCtx(ctx);
+          const allowed = session && (await canSeeInvitations(db, workspace.id, session.user.id));
+          if (!allowed) return ctx.json({ ...workspace, invitations: [] });
+        }
+        return undefined;
       }),
     },
 
@@ -286,6 +319,9 @@ export function createAuth(options: AuthOptions) {
           beforeAddMember: ({ member }) => {
             assertWorkspaceRole(member.role);
             return Promise.resolve();
+          },
+          beforeCancelInvitation: async ({ invitation, cancelledBy }) => {
+            await assertCanCancelInvitation(db, invitation, cancelledBy.id);
           },
           beforeUpdateMemberRole: ({ newRole }) => {
             assertWorkspaceRole(newRole);

@@ -1,6 +1,13 @@
 'use client';
 
-import { ChevronsUpDown, LogOut, MonitorSmartphone, ShieldCheck, UserRound } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  LogOut,
+  Mail,
+  MonitorSmartphone,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -70,6 +77,11 @@ export function AccountMenu() {
             <DropdownMenuItem asChild>
               <Link href="/account/sessions">
                 <MonitorSmartphone /> Sessions
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/invitations">
+                <Mail /> Invitations
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

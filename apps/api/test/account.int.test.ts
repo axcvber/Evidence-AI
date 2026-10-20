@@ -605,6 +605,11 @@ describe('active workspace of a new session', () => {
   it('never starts in a workspace the user is no longer a member of', async () => {
     const { agent, email, first, second } = await userWithTwoWorkspaces();
     const { id: userId } = (await me(agent)).user;
+    // Someone else owns `second` too, since a workspace can't be left without an owner.
+    const coOwner = (await me((await newUser('co-owner')).agent)).user.id;
+    await owner.db.execute(sql`
+      insert into memberships (tenant_id, user_id, role) values (${second}, ${coOwner}, 'owner')
+    `);
     await owner.db.execute(
       sql`delete from memberships where tenant_id = ${second} and user_id = ${userId}`,
     );

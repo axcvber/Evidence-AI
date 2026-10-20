@@ -7,6 +7,7 @@ import { requestIdMiddleware } from './common/request-id.js';
 import { setupApiDocs } from './docs/api-docs.js';
 
 export const API_PREFIX = 'api';
+export const KEEP_ALIVE_TIMEOUT_MS = 65_000;
 
 /** The part of the Express app we use, typed without depending on express directly. */
 interface RawRouter {
@@ -31,6 +32,13 @@ export function configureApp(app: NestExpressApplication, options: ConfigureAppO
     toNodeHandler(auth),
   );
   app.useBodyParser('json', { limit: '1mb' });
+
+  // Keep idle connections open longer than the proxy in front (the Next proxy locally, the
+  // load balancer's 60s idle timeout in production). With Node's 5s default, the proxy can
+  // reuse a connection the API is closing at that moment, and the request fails ECONNRESET.
+  const server = app.getHttpServer() as { keepAliveTimeout: number; headersTimeout: number };
+  server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+  server.headersTimeout = KEEP_ALIVE_TIMEOUT_MS + 1_000;
 
   app.setGlobalPrefix(API_PREFIX);
   app.enableShutdownHooks();

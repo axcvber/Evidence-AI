@@ -59,7 +59,7 @@ Env files: one per workspace, each with a committed `.env.example`; `pnpm env:in
 - `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm format` / `pnpm format:check`
 - `pnpm test` – unit and integration tests (Vitest, per workspace via turbo). Needs `pnpm infra:up`: DB tests use the `evidence_test` database and API tests use Redis database 1 (`TEST_REDIS_URL`) with a unique key prefix per test app
 - `pnpm infra:up` / `pnpm infra:down` – Docker Compose: Postgres+pgvector (:5440), Redis (:6390), MinIO (:9000, console :9001), Langfuse (:3100), ClickHouse (internal)
-- `pnpm e2e` – Playwright (not yet created)
+- `pnpm e2e` – Playwright end-to-end tests (`apps/e2e`). Needs `pnpm infra:up` and `pnpm exec playwright install chromium` once (from `apps/e2e`). It builds the API and web app, migrates and seeds `evidence_test`, then runs them on their own ports (web :3200, API :4200), so dev servers keep running. Emails go to `apps/e2e/.outbox` (`EMAIL_TRANSPORT=outbox`), never Resend. `pnpm --filter @evidence/e2e e2e:run` reruns the tests without rebuilding. It leaves `apps/web/.next` built against the e2e API, so run `pnpm build` again before using `next start` yourself.
 - `pnpm eval` – run the eval suite (not yet created)
 - `pnpm db:generate` – generate a migration from `packages/db/src/schema` (`pnpm --filter @evidence/db exec drizzle-kit generate --custom --name x` for hand-written SQL)
 - `pnpm db:migrate` – apply migrations as `evidence_owner` (`DATABASE_OWNER_URL`)

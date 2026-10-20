@@ -1,0 +1,21 @@
+{
+  "name": "@evidence/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e": "node prepare.ts && playwright test",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "e2e:run": "playwright test"
+  },
+  "devDependencies": {
+    "@evidence/eslint-config": "workspace:*",
+    "@evidence/tsconfig": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "eslint": "10.12.0"
+  },
+  "dependencies": {
+    "@evidence/db": "workspace:*"
+  }
+}

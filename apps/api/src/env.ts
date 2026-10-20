@@ -44,6 +44,11 @@ export const apiEnvSchema = serverEnvSchema
 
     RESEND_API_KEY: z.string().startsWith('re_').optional(),
     EMAIL_FROM: emailSender,
+    // How email leaves the API: `resend`, `console` (logged) or `outbox` (JSON files in
+    // EMAIL_OUTBOX_DIR, read by the end-to-end tests). Defaults to resend when a key is set,
+    // otherwise console. Production only allows resend.
+    EMAIL_TRANSPORT: z.enum(['resend', 'console', 'outbox']).optional(),
+    EMAIL_OUTBOX_DIR: z.string().min(1).optional(),
 
     // Social sign-in. Each provider is on only when both its client ID and secret are set.
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
@@ -69,6 +74,27 @@ export const apiEnvSchema = serverEnvSchema
         code: 'custom',
         path: ['RESEND_API_KEY'],
         message: 'Required in production',
+      });
+    }
+    if (env.NODE_ENV === 'production' && env.EMAIL_TRANSPORT && env.EMAIL_TRANSPORT !== 'resend') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_TRANSPORT'],
+        message: 'Only resend is allowed in production',
+      });
+    }
+    if (env.EMAIL_TRANSPORT === 'outbox' && !env.EMAIL_OUTBOX_DIR) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_OUTBOX_DIR'],
+        message: 'Required when EMAIL_TRANSPORT is outbox',
+      });
+    }
+    if (env.EMAIL_TRANSPORT === 'resend' && !env.RESEND_API_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RESEND_API_KEY'],
+        message: 'Required when EMAIL_TRANSPORT is resend',
       });
     }
     if (env.NODE_ENV === 'production' && !env.CLIENT_IP_HEADER) {
@@ -124,6 +150,12 @@ export function socialProviderCredentials(env: ApiEnv): SocialProviderCredential
     credentials.github = { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET };
   }
   return credentials;
+}
+
+export function emailTransport(
+  env: Pick<ApiEnv, 'EMAIL_TRANSPORT' | 'RESEND_API_KEY'>,
+): 'resend' | 'console' | 'outbox' {
+  return env.EMAIL_TRANSPORT ?? (env.RESEND_API_KEY ? 'resend' : 'console');
 }
 
 export function devMocksEnabled(env: Pick<ApiEnv, 'NODE_ENV' | 'DEV_MOCKS_ENABLED'>): boolean {

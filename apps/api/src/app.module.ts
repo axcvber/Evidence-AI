@@ -10,6 +10,7 @@ import {
   apiDocsEnabled,
   authRateLimitEnabled,
   devMocksEnabled,
+  emailTransport,
   socialProviderCredentials,
 } from './env.js';
 import { GroupsModule } from './groups/groups.module.js';
@@ -33,7 +34,9 @@ export class AppModule {
         DatabaseModule.forRoot({ url: env.DATABASE_URL }),
         RedisModule.forRoot({ url: env.REDIS_URL }),
         EmailModule.forRoot({
+          transport: emailTransport(env),
           resendApiKey: env.RESEND_API_KEY,
+          outboxDir: env.EMAIL_OUTBOX_DIR,
           from: env.EMAIL_FROM,
           sender: emailSender,
         }),

@@ -1,0 +1,4 @@
+# Emails written by the API during a run (EMAIL_TRANSPORT=outbox), and Playwright output.
+.outbox/
+test-results/
+playwright-report/

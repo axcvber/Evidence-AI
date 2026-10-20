@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { socialProviderCredentials } from '../src/env.js';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { OutboxEmailSender } from '../src/email/outbox-email-sender.js';
+import { emailTransport, socialProviderCredentials } from '../src/env.js';
 import { testApiEnv } from './support/env.js';
 
 describe('API env', () => {
@@ -72,5 +76,48 @@ describe('social sign-in env', () => {
     { GITHUB_CLIENT_SECRET: 'secret' },
   ])('rejects half a provider config: %o', (half) => {
     expect(() => testApiEnv(half)).toThrow(/Set both/);
+  });
+});
+
+describe('email transport', () => {
+  const production = {
+    NODE_ENV: 'production',
+    RESEND_API_KEY: 're_test',
+    CLIENT_IP_HEADER: 'x-forwarded-for',
+  };
+
+  it('defaults to resend with a key and console without', () => {
+    expect(emailTransport(testApiEnv({ RESEND_API_KEY: 're_test' }))).toBe('resend');
+    expect(emailTransport(testApiEnv())).toBe('console');
+  });
+
+  it.each(['outbox', 'console'])('refuses %s in production', (transport) => {
+    expect(() =>
+      testApiEnv({ ...production, EMAIL_TRANSPORT: transport, EMAIL_OUTBOX_DIR: '/tmp/x' }),
+    ).toThrow(/EMAIL_TRANSPORT/);
+  });
+
+  it('needs a directory for the outbox and a key for resend', () => {
+    expect(() => testApiEnv({ EMAIL_TRANSPORT: 'outbox' })).toThrow(/EMAIL_OUTBOX_DIR/);
+    expect(() => testApiEnv({ EMAIL_TRANSPORT: 'resend' })).toThrow(/RESEND_API_KEY/);
+    expect(
+      emailTransport(testApiEnv({ EMAIL_TRANSPORT: 'outbox', EMAIL_OUTBOX_DIR: '/tmp/x' })),
+    ).toBe('outbox');
+  });
+});
+
+describe('OutboxEmailSender', () => {
+  it('writes each email as a JSON file', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'outbox-'));
+    await new OutboxEmailSender(dir).send({
+      to: 'a@example.test',
+      subject: 'Hi',
+      text: 't',
+      html: 'h',
+    });
+    const [file] = await readdir(dir);
+    const saved = JSON.parse(await readFile(path.join(dir, file ?? ''), 'utf8')) as object;
+    expect(saved).toMatchObject({ to: 'a@example.test', subject: 'Hi', text: 't', html: 'h' });
+    await rm(dir, { recursive: true });
   });
 });

@@ -1,0 +1,9 @@
+{
+  "extends": "@evidence/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["*.ts", "support", "tests"]
+}

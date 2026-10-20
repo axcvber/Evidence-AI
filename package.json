@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose up -d --wait",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "e2e": "pnpm --filter @evidence/e2e e2e"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

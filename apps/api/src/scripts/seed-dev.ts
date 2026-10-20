@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      '\nDev seed ready. Sign in at http://localhost:3000/login with password:',
+      `\nDev seed ready. Sign in at ${env.BETTER_AUTH_URL}/login with password:`,
       PASSWORD,
     );
     console.table([

@@ -76,11 +76,19 @@ function EditGroupForm({ group }: { group: Group }) {
 
 /** Workspace members who aren't in the group yet, to pick from. */
 function AddMember({ groupId, memberIds }: { groupId: string; memberIds: Set<string> }) {
-  const { data: workspace } = authClient.useActiveOrganization();
+  const { data: workspace, isPending, error } = authClient.useActiveOrganization();
   const add = useAddGroupMember(groupId);
   const [userId, setUserId] = useState('');
-  const candidates = (workspace?.members ?? []).filter((m) => !memberIds.has(m.userId));
 
+  if (isPending) return <Skeleton className="h-9 w-full" />;
+  if (error || !workspace) {
+    return (
+      <p className="text-sm text-destructive">
+        Couldn&apos;t load the workspace&apos;s members. Close this panel and try again.
+      </p>
+    );
+  }
+  const candidates = workspace.members.filter((m) => !memberIds.has(m.userId));
   if (candidates.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">Everyone in the workspace is in this group.</p>

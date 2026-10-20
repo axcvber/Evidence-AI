@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, TestApp } from './support/app.js';
 import {
   createWorkspace,
+  expectNoWorkspaceAccess,
   randomClientIp,
   signUpVerified,
   TEST_PASSWORD,
@@ -115,7 +116,7 @@ describe('sessions shared through Redis', () => {
       update sessions set active_tenant_id = ${victimTenant}
       where token = ${tokenFrom(cookie)}
     `);
-    await request(b.server).get('/api/me').set('Cookie', cookie).expect(403);
+    await expectNoWorkspaceAccess((path) => request(b.server).get(path).set('Cookie', cookie));
   });
 });
 

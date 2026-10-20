@@ -1,11 +1,11 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
-import { DomainExceptionFilter } from './common/domain-exception.filter.js';
+import { ContractsModule } from './contracts/contracts.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EmailSender } from './email/email-sender.js';
 import { EmailModule } from './email/email.module.js';
-import { ApiEnv, authRateLimitEnabled } from './env.js';
+import { DevMocksModule } from './dev-mocks/dev-mocks.module.js';
+import { ApiEnv, apiDocsEnabled, authRateLimitEnabled, devMocksEnabled } from './env.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -37,16 +37,18 @@ export class AppModule {
           secureCookies: env.NODE_ENV === 'production',
           redisKeyPrefix: env.AUTH_REDIS_KEY_PREFIX,
           rateLimit: authRateLimitEnabled(env),
+          openApiReference: apiDocsEnabled(env),
           clientIp: {
             header: env.CLIENT_IP_HEADER ?? 'x-forwarded-for',
             trustedProxies: env.TRUSTED_PROXIES,
           },
         }),
+        ContractsModule,
         TenancyModule,
         HealthModule,
         MeModule,
+        ...(devMocksEnabled(env) ? [DevMocksModule] : []),
       ],
-      providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
     };
   }
 }

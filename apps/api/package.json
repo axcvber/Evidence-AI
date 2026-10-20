@@ -9,7 +9,8 @@
     "start": "node --env-file-if-exists=.env dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:dev": "nest build && node --env-file-if-exists=.env dist/scripts/seed-dev.js"
   },
   "dependencies": {
     "@better-auth/redis-storage": "1.7.7",

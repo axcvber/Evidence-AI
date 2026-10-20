@@ -32,6 +32,11 @@ export function baseConfig(tsconfigRootDir) {
         // Nest DI reads constructor types from decorator metadata, so those imports must stay value imports.
         '@typescript-eslint/consistent-type-imports': 'off',
         '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+        // `onChange={(e) => setValue(e.target.value)}` is idiomatic; still flags other void returns.
+        '@typescript-eslint/no-confusing-void-expression': [
+          'error',
+          { ignoreArrowShorthand: true },
+        ],
       },
     },
     {

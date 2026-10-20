@@ -12,7 +12,7 @@ import { redisStorage } from '@better-auth/redis-storage';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
-import { organization } from 'better-auth/plugins';
+import { openAPI, organization } from 'better-auth/plugins';
 import { workspaceRoleNames } from '@evidence/shared';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
@@ -32,6 +32,8 @@ export interface AuthOptions {
   redis: Redis;
   redisKeyPrefix: string;
   rateLimit: boolean;
+  /** Serve Better Auth's own API reference at /api/auth/reference (same switch as /api/docs). */
+  openApiReference: boolean;
   clientIp: { header: string; trustedProxies?: string[] | undefined };
 }
 
@@ -171,6 +173,8 @@ export function createAuth(options: AuthOptions) {
           invitation: { modelName: 'invitations', fields: { organizationId: 'tenantId' } },
         },
       }),
+      // Listed after organization() so its inferred session fields stay typed.
+      ...(options.openApiReference ? [openAPI()] : []),
     ],
   });
 }

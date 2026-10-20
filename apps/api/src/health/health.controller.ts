@@ -1,5 +1,5 @@
 import type { Database } from '@evidence/db';
-import { Controller, Get, HttpException, HttpStatus, Inject } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Inject, Res } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -46,7 +46,9 @@ export class HealthController {
     description: 'A dependency is down',
     standardSchema: readinessResponseSchema,
   })
-  async ready(): Promise<ReadinessResponse> {
+  async ready(
+    @Res({ passthrough: true }) response: { status(code: number): unknown },
+  ): Promise<ReadinessResponse> {
     // `select 1` touches no tenant data, so it runs outside a tenant transaction.
     const [database, redis] = await Promise.all([
       probe(() => this.db.execute(sql`select 1`)),
@@ -56,7 +58,7 @@ export class HealthController {
       status: database === 'ok' && redis === 'ok' ? 'ok' : 'unavailable',
       checks: { database, redis },
     };
-    if (result.status !== 'ok') throw new HttpException(result, HttpStatus.SERVICE_UNAVAILABLE);
+    if (result.status !== 'ok') response.status(HttpStatus.SERVICE_UNAVAILABLE);
     return result;
   }
 }

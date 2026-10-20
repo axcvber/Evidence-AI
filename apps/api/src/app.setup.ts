@@ -3,6 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { toNodeHandler } from 'better-auth/node';
 import { Auth, AUTH_BASE_PATH } from './auth/auth.js';
 import { AUTH } from './auth/auth.tokens.js';
+import { requestIdMiddleware } from './common/request-id.js';
 import { setupApiDocs } from './docs/api-docs.js';
 
 export const API_PREFIX = 'api';
@@ -23,6 +24,8 @@ export interface ConfigureAppOptions {
  */
 export function configureApp(app: NestExpressApplication, options: ConfigureAppOptions): void {
   const auth = app.get<Auth>(AUTH);
+  // First, so Better Auth's routes get request IDs too.
+  app.use(requestIdMiddleware);
   (app.getHttpAdapter().getInstance() as RawRouter).all(
     `${AUTH_BASE_PATH}/*splat`,
     toNodeHandler(auth),

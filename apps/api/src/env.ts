@@ -15,6 +15,8 @@ export const apiEnvSchema = serverEnvSchema
     PORT: z.coerce.number().int().min(1).max(65535).default(4000),
     // Swagger UI exposes the full API surface, so it is off in production unless enabled explicitly.
     API_DOCS_ENABLED: z.stringbool().optional(),
+    // Canned /api/dev-mocks/* endpoints for features from later phases; never in production.
+    DEV_MOCKS_ENABLED: z.stringbool().optional(),
 
     // Better Auth connects as evidence_auth: auth tables only (see packages/db/src/schema/rls.ts).
     AUTH_DATABASE_URL: postgresUrl,
@@ -59,6 +61,13 @@ export const apiEnvSchema = serverEnvSchema
         message: 'Required in production (the header your load balancer sets)',
       });
     }
+    if (env.NODE_ENV === 'production' && env.DEV_MOCKS_ENABLED === true) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DEV_MOCKS_ENABLED'],
+        message: 'Dev mocks cannot run in production',
+      });
+    }
     if (env.NODE_ENV === 'production' && env.AUTH_RATE_LIMIT_ENABLED === false) {
       ctx.addIssue({
         code: 'custom',
@@ -82,4 +91,8 @@ export function authRateLimitEnabled(
   env: Pick<ApiEnv, 'NODE_ENV' | 'AUTH_RATE_LIMIT_ENABLED'>,
 ): boolean {
   return env.AUTH_RATE_LIMIT_ENABLED ?? env.NODE_ENV !== 'test';
+}
+
+export function devMocksEnabled(env: Pick<ApiEnv, 'NODE_ENV' | 'DEV_MOCKS_ENABLED'>): boolean {
+  return env.NODE_ENV !== 'production' && (env.DEV_MOCKS_ENABLED ?? true);
 }

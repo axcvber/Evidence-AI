@@ -8,7 +8,10 @@ export function createApiDocument(app: INestApplication): OpenAPIObject {
     .setTitle('Evidence AI API')
     .setDescription(
       'Multi-tenant knowledge assistant: documents, search and cited answers. ' +
-        'Every endpoint is scoped to the caller’s workspace.',
+        'Every endpoint is scoped to the caller’s workspace. ' +
+        'Errors use one shape: `{ statusCode, code, message, details?, requestId }`. ' +
+        'Authentication endpoints (sign-up, sign-in, sessions, workspaces, invitations) are ' +
+        'documented separately at [/api/auth/reference](/api/auth/reference).',
     )
     .setVersion('0.1.0')
     // Session cookie set by Better Auth (/api/auth/*); open the docs through the web origin to send it.

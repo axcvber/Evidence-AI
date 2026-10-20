@@ -9,6 +9,7 @@ import {
   Agent,
   browser,
   createWorkspace,
+  expectNoWorkspaceAccess,
   signUpVerified,
   TEST_PASSWORD,
   uniqueEmail,
@@ -252,7 +253,7 @@ describe('active workspace checks (AuthGuard)', () => {
     stored.session.activeOrganizationId = victimTenant;
     await redis.set(key, JSON.stringify(stored), 'KEEPTTL');
 
-    await attacker.get('/api/me').expect(403);
+    await expectNoWorkspaceAccess((path) => attacker.get(path));
   });
 
   it('ignores edits to the Postgres copy of a session (reads come from Redis)', async () => {
@@ -281,6 +282,6 @@ describe('active workspace checks (AuthGuard)', () => {
       .post('/api/auth/organization/remove-member')
       .send({ memberIdOrEmail: email })
       .expect(200);
-    await member.get('/api/me').expect(403);
+    await expectNoWorkspaceAccess((path) => member.get(path));
   });
 });

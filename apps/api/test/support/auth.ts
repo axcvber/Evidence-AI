@@ -54,3 +54,20 @@ export async function createWorkspace(agent: Agent, name: string, slug: string):
   const res = await agent.post('/api/auth/organization/create').send({ name, slug }).expect(200);
   return (res.body as { id: string }).id;
 }
+
+type Getter = (path: string) => request.Test;
+
+/**
+ * The user gets no access to the active workspace: /api/me reports none, and a tenant route
+ * fails closed. Used for stale, tampered or revoked memberships.
+ */
+export async function expectNoWorkspaceAccess(get: Getter): Promise<void> {
+  const me = await get('/api/me').expect(200);
+  if ((me.body as { activeWorkspace: unknown }).activeWorkspace !== null) {
+    throw new Error('Expected no active workspace');
+  }
+  const res = await get('/api/dev-mocks/documents').expect(403);
+  if ((res.body as { code?: string }).code !== 'NO_ACTIVE_WORKSPACE') {
+    throw new Error(`Expected NO_ACTIVE_WORKSPACE, got ${JSON.stringify(res.body)}`);
+  }
+}

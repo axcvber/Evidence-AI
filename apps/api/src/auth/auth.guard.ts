@@ -3,7 +3,6 @@ import { memberships, withTenantContext } from '@evidence/db';
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -20,8 +19,8 @@ import { IS_PUBLIC } from './public.decorator.js';
 /**
  * Global guard: every route needs a valid session unless marked @Public(). When the session
  * has an active workspace, the membership is re-checked in the database on every request
- * (so removed members lose access immediately) and the tenant context is attached for
- * TenantTransactionInterceptor.
+ * (so removed members lose access immediately); only a confirmed membership attaches the
+ * tenant context for TenantTransactionInterceptor and the role for RolesGuard.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -48,9 +47,13 @@ export class AuthGuard implements CanActivate {
     if (tenantId) {
       const userId = session.user.id;
       const role = await this.findRole(tenantId, userId);
-      if (!role) throw new ForbiddenException('You are not a member of the active workspace');
-      request.tenantContext = { tenantId, userId };
-      request.membershipRole = role;
+      // A stale or forged active workspace (membership removed, session tampered with) grants
+      // nothing: no tenant context, no role. Tenant routes then fail closed with
+      // NO_ACTIVE_WORKSPACE, while /api/me still answers so the user can pick another workspace.
+      if (role) {
+        request.tenantContext = { tenantId, userId };
+        request.membershipRole = role;
+      }
     }
     return true;
   }

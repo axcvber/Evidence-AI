@@ -15,6 +15,7 @@
     "test": "turbo run test",
     "db:generate": "pnpm --filter @evidence/db db:generate",
     "db:migrate": "pnpm --filter @evidence/db db:migrate",
+    "db:seed:dev": "pnpm --filter @evidence/api seed:dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "infra:up": "docker compose up -d --wait",
